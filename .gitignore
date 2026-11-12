@@ -1,0 +1,26 @@
+node_modules/
+dist/
+*.log
+.env
+# scripts de test/debug de session (pas du code produit)
+check-types.sh
+run-build-and-test.sh
+test-curl.sh
+test-live.ts
+verify-all.sh
+# jamais commit un token
+.mobbin-mcp/
+auth.json
+cap*.mjs
+verify-fix.mjs
+test-live.ts
+.agents/
+investigate-search.mjs
+test-chatgpt-screens.ts
+
+# Local downloads and operating-system files
+output/
+.DS_Store
+
+# Local assistant configuration
+.claude/
