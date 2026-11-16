@@ -6,9 +6,34 @@
 
 > The original mobbin-mcp is **archived and broken**. This fork fixes it.
 
-An MCP server that works with [Mobbin](https://mobbin.com) — 600k+ real app screens and flows from 1,100+ apps. Search screens, browse flows, grab palettes, build better UI without leaving Claude. Mobbin has no public API. This server reverse-engineers their internal endpoints.
+An MCP server that works with [Mobbin](https://mobbin.com) — 600k+ real app screens and flows from 1,100+ apps. Search screens, browse flows, grab palettes, build better UI without leaving Claude. Mobbin now offers an [official API and MCP](https://docs.mobbin.com/mcp/introduction). This independent server uses authenticated website routes instead.
 
 The local build includes the image-resolution fix from `ScreenClear-for-Mobbin-1.1.1`. Encrypted CDN previews are resolved to their original screenshot paths before download. Discovery preserves the opaque `enc` parameter, validates the returned screenshot path, and falls back to the supplied URL if lookup or download fails. Tiny placeholders are reported as errors rather than returned as screenshots.
+
+## Independent 1.4 upgrade
+
+This server does not connect to Mobbin's official MCP or OAuth service. It keeps the existing website-session authentication and respects the responses and account permissions enforced by Mobbin.
+
+| Feature | Implementation | Verification |
+| --- | --- | --- |
+| Interactive screen gallery | Optional MCP Apps resource; text and inline images also work directly in Codex | Browser checks using cached references; live MCP resource/image checks |
+| Free-text screen and flow search | `query` on the existing search tools, using the website's standard search | Signed-in stdio MCP checks passed on 2026-11-16 |
+| Website sections | `mobbin_search_sections`, with queries, filters, images, and metadata | Signed-in search and full-resolution image download verified |
+| All saved | `mobbin_get_saved`; mobile apps, web apps, and website sections (`sites` bucket) | Signed-in empty and populated saved-item checks passed |
+| Collections | `mobbin_create_collection`, `mobbin_save_content`, and collection readback | Private temporary collection created, populated, read back, and removed; original saved items preserved |
+| Comments | `mobbin_get_comments` and `mobbin_add_comment` with plain text/reply support | Reading verified live; posting serialization and action discovery checked without posting a test message |
+| Deep Search | Explicit `mode: "deep"` on screen search, using the website backend and account permissions | Account-access guard tested; the verification session reports Deep Search disabled, so the search itself was not run |
+| Agent workflow guidance | Server initialization instructions describe discovery, image inspection, pagination, and account writes | Included directly in the MCP connection; no separate site or plugin installation required |
+
+This is an independent MCP server, not a copy of Mobbin's private search engine. Deep Search requires access in the signed-in Mobbin workspace and may consume its AI credits. `mobbin_get_capabilities` reads account feature flags without running a search. Unknown access is reported as unknown, not granted.
+
+Search endpoints return fixed native batches. The server caches a search session briefly and translates `page_size`/`page_index` across those batches, preserving rows at page boundaries. Advertised catalog totals can exceed the rows the website actually returns; paging stops when the next native batch is empty. Echo `search_request_id` from the previous response for stable continuation. Website routes and server actions can change. Writes are not retried automatically after an uncertain response: check the account before retrying.
+
+Posting comments is an account-changing action and can notify workspace collaborators. The MCP only posts when explicitly requested with the user's supplied text. No test comments were posted during verification.
+
+MCP Apps hosts can render the gallery inside a conversation. Other clients still receive text and inline images. Gallery resources are bundled locally; no external JavaScript CDN is required.
+
+The image tools also retain the app-by-app screen listing, Android taxonomy filters, full-size image resolution, and dominant-color extraction from the earlier version.
 
 ## Screens and images
 
@@ -23,7 +48,7 @@ The `restricted` flag describes Mobbin's preview; it does not establish whether 
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - A [Mobbin](https://mobbin.com) account (free works)
 
 ### 1. Install & build
@@ -80,7 +105,7 @@ claude mcp add mobbin -- node /absolute/path/to/mobbin-forge/dist/index.js
 }
 ```
 
-Restart your MCP client after configuration changes. Rebuild with `npm run build` after editing source files.
+Restart your MCP client after configuration changes or this upgrade so it refreshes tool metadata and gallery resources. Rebuild with `npm run build` after editing source files.
 
 ## Verification
 
@@ -92,13 +117,33 @@ npm run format:check
 npm run test:live
 ```
 
-`test:live` is an opt-in network check using your stored Mobbin session. It exercises the stdio MCP connection, app lookup, first and last screen pages, full-size image responses, colors, flows, search, popular apps, collections listing, and filters. It does not download every screenshot in the catalog.
+`test:live` is an opt-in network check using your stored Mobbin session. A fresh cookie is required; authentication validates the session before saving it. It exercises the stdio MCP connection, app lookup, first and last screen pages, full-size image responses, colors, flows, search, popular apps, collections listing, filters, website sections, saved items, comment reads, and account-capability reporting. If Deep Search is unavailable, it verifies the denial without running a paid/credit-consuming search. It does not post comments, create collections, or download every screenshot in the catalog.
+
+## Gallery preview
+
+```bash
+npm run preview:gallery
+```
+
+This developer preview binds only to `127.0.0.1:43190` and uses the real local MCP. It requires a valid website session. Its browser endpoint allows only read-only gallery calls.
+
+For UI checks using the three Duolingo images previously downloaded into this checkout:
+
+```bash
+npm run preview:gallery -- --cached
+```
+
+Cached mode is labeled clearly and does not demonstrate current signed-in search or write behavior. The downloaded images and browser artifacts stay in ignored `output/` folders.
 
 ## Example prompts
 
 - "Show me how DoorDash and Uber Eats handle checkout flows"
 - "Pull up Duolingo's onboarding and walk me through the design decisions"
 - "Find login screens using bottom sheets and extract color palettes"
+- "Search for banking onboarding with a progress bar and show a gallery"
+- "Find website pricing sections with a monthly/yearly toggle"
+- "Show all my saved website sections"
+- "Create a private collection named Checkout references"
 
 ## How it works
 

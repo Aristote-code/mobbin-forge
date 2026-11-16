@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 (2026-11-16)
+
+- Add standard free-text queries, website-section search, saved-item access, account capability reporting, and comment tools to the independent MCP.
+- Add optional in-chat galleries, inline thumbnails, full-image inspection, and MCP workflow instructions for coding agents.
+- Verify private collection creation, saving, and readback against a signed-in account; remove temporary verification data afterward.
+- Translate requested page sizes across the website's fixed result batches and handle empty batches despite larger catalog totals.
+- Accept current saved/collection response shapes and validate login before storing credentials.
+- Add opt-in website Deep Search routing with account-access checks. The verification session lacks access, so no Deep Search was run.
+- Upgrade the MCP SDK, image decoder, and Zod validation library; runtime dependency audit reports no known vulnerabilities.
+- Add regression tests and expand read-only live MCP verification. Comment posting is covered by serialization tests and deployed-action discovery, without sending test messages.
+
 ## [1.3.1](https://github.com/pdcolandrea/mobbin-mcp/compare/v1.3.0...v1.3.1) (2026-05-05)
 
 

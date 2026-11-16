@@ -177,8 +177,10 @@ export function formatCollectionItems(items: CollectionItem[]): string {
         .filter(Boolean)
         .join("\n");
     }
-    // Fallback for unhandled contentTypes (sites/sections aren't surfaced through
-    // the search tools yet, so skip detail rendering and just record the type).
+    if (item.contentType === "sections" && item.section) {
+      const section = item.section;
+      return `### ${i + 1}. [section] ${section.siteName}\n- **Section ID**: ${section.id}\n- **Image URL**: ${section.imageUrl}\n- **Mobbin URL**: https://mobbin.com/sites/sections/${section.id}`;
+    }
     return `### ${i + 1}. [${item.contentType}] (saved item id: ${item.id})`;
   });
 

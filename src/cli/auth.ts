@@ -1,5 +1,6 @@
 import readline from "node:readline";
 import { writeStoredSession } from "../utils/auth-store.js";
+import { MobbinApiClient } from "../services/api-client.js";
 import { MobbinAuth } from "../services/auth.js";
 
 function prompt(rl: readline.Interface, question: string): Promise<string> {
@@ -27,8 +28,10 @@ export async function runAuthFlow(): Promise<void> {
     }
 
     const auth = MobbinAuth.fromCookie(cookie);
-    const session = auth.getSession();
-    writeStoredSession(session);
+    console.log("Validating the Mobbin session…");
+    await auth.getCookieValue();
+    await new MobbinApiClient(auth).getCollections();
+    writeStoredSession(auth.getSession());
 
     console.log(
       "\nAuthenticated successfully! Session saved to ~/.mobbin-mcp/auth.json" +

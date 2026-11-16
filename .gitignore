@@ -24,3 +24,5 @@ output/
 
 # Local assistant configuration
 .claude/
+
+.playwright-cli/

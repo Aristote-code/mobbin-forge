@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mobbin Forge gallery</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font:
+          14px system-ui,
+          sans-serif;
+        color: light-dark(#182018, #eef3ec);
+        background: light-dark(#f5f7f3, #151a15);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 20px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      h1 {
+        font-size: 20px;
+        letter-spacing: -0.6px;
+        margin: 4px 0;
+      }
+      #count,
+      small,
+      #status {
+        color: light-dark(#697165, #a9b3a4);
+      }
+      .brand {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: light-dark(#397828, #a4d881);
+        font-weight: 700;
+      }
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 18px 0 12px;
+      }
+      input,
+      select,
+      button {
+        font: inherit;
+        color: inherit;
+        border: 1px solid light-dark(#dce2d7, #3a4436);
+        border-radius: 8px;
+        background: light-dark(#fff, #232b21);
+        padding: 9px 12px;
+      }
+      input {
+        flex: 1;
+        min-width: 160px;
+      }
+      button {
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 3px solid #7cb64d;
+        outline-offset: 2px;
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+        gap: 14px;
+      }
+      #grid[data-density="compact"] {
+        grid-template-columns: repeat(auto-fill, minmax(125px, 1fr));
+      }
+      article {
+        overflow: hidden;
+        border: 1px solid light-dark(#dfe5da, #354030);
+        border-radius: 12px;
+        background: light-dark(#fff, #20281d);
+      }
+      .image-button {
+        display: flex;
+        position: relative;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 310px;
+        border: 0;
+        border-radius: 0;
+        padding: 12px;
+        background: light-dark(#e9ede5, #293226);
+      }
+      .image-button:disabled {
+        opacity: 1;
+      }
+      .image-button img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+        border-radius: 5px;
+      }
+      #grid[data-density="compact"] .image-button {
+        height: 240px;
+      }
+      .image-state {
+        font-size: 12px;
+        max-width: 120px;
+        text-align: center;
+      }
+      .info {
+        padding: 12px;
+      }
+      .info h2 {
+        font-size: 13px;
+        margin: 0 0 5px;
+      }
+      .info p {
+        font-size: 12px;
+        line-height: 1.5;
+        margin: 0 0 6px;
+        overflow-wrap: anywhere;
+      }
+      .info small {
+        font-size: 10px;
+      }
+      #status {
+        font-size: 12px;
+        min-height: 18px;
+        margin: 12px 0;
+      }
+      footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 14px;
+        margin-top: 20px;
+      }
+      dialog {
+        width: min(95vw, 900px);
+        max-height: 94vh;
+        border: 1px solid #6e8063;
+        border-radius: 14px;
+        padding: 16px;
+        color: inherit;
+        background: light-dark(#fff, #1d251a);
+      }
+      dialog::backdrop {
+        background: #000a;
+      }
+      .dialog-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: space-between;
+        margin-bottom: 12px;
+      }
+      #detail-title {
+        font-size: 14px;
+        margin: 0;
+      }
+      #full-image {
+        display: block;
+        max-width: 100%;
+        max-height: 72vh;
+        object-fit: contain;
+        margin: auto;
+      }
+      #open-original {
+        display: block;
+        margin: 14px auto 0;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      @media (max-width: 430px) {
+        body {
+          padding: 12px;
+        }
+        #grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .image-button {
+          height: 250px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="brand">Mobbin Forge</div>
+        <h1 id="title">Screen references</h1>
+        <span id="count"></span>
+      </div>
+    </header>
+    <div class="controls">
+      <input
+        id="filter"
+        type="search"
+        aria-label="Filter this page"
+        placeholder="Filter this page by app or pattern"
+      /><label
+        >View
+        <select id="density">
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+        </select></label
+      >
+    </div>
+    <p id="status" role="status" aria-live="polite">Waiting for screens…</p>
+    <main id="grid"></main>
+    <footer>
+      <button id="previous" disabled>Previous</button><span id="page">Page 1</span
+      ><button id="next" disabled>Next</button>
+    </footer>
+    <dialog id="detail">
+      <div class="dialog-header">
+        <h2 id="detail-title"></h2>
+        <button id="close" aria-label="Close screenshot">Close</button>
+      </div>
+      <img id="full-image" alt="Full-size screenshot" /><button id="open-original">
+        Open original image
+      </button>
+    </dialog>
+    <script type="module">
+      /* GALLERY_SCRIPT */
+    </script>
+  </body>
+</html>

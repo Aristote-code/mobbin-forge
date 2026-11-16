@@ -1,4 +1,6 @@
 import sharp from "sharp";
+import { randomUUID } from "node:crypto";
+import { WebsiteActions } from "./website-actions.js";
 import { z } from "zod";
 import {
   MOBBIN_BASE_URL,
@@ -14,6 +16,7 @@ import {
   COLOR_QUANTIZE_MAX,
 } from "../constants.js";
 import {
+  searchSectionsResponseSchema,
   searchAppsResponseSchema,
   searchScreensResponseSchema,
   searchFlowsResponseSchema,
@@ -55,10 +58,23 @@ import type {
  */
 export class MobbinApiClient {
   private auth: MobbinAuth;
+  private searchSessions = new Map<
+    string,
+    {
+      expiresAt: number;
+      requestId: string;
+      first: unknown;
+      nativeSize: number;
+      pages: Map<number, unknown>;
+    }
+  >();
+  private capabilityCache?: { expiresAt: number; value: AccountCapabilities };
+  private actions: WebsiteActions;
   private originalUrls = new Map<string, Promise<string | null>>();
 
   constructor(auth: MobbinAuth) {
     this.auth = auth;
+    this.actions = new WebsiteActions(auth);
   }
 
   /**
@@ -98,6 +114,7 @@ export class MobbinApiClient {
     }
 
     const json = await res.json();
+    if (json?.error?.message) throw new Error(`Mobbin API: ${json.error.message} - ${path}`);
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
       const issues = parsed.error.issues
@@ -111,6 +128,121 @@ export class MobbinApiClient {
       });
     }
     return parsed.data;
+  }
+
+  /** Adapt the website's fixed native batches to the requested MCP page size. */
+  private async searchRequest<
+    S extends z.ZodType<{
+      value: { data: unknown[]; searchRequestId: string; hasNextPage?: boolean };
+    }>,
+  >(
+    path: string,
+    schema: S,
+    params: { searchQuery: unknown; searchRequestId: string; pageSize: number; pageIndex: number },
+  ): Promise<z.infer<S>> {
+    const { pageSize, pageIndex } = params;
+    if (
+      !Number.isInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > 100 ||
+      !Number.isInteger(pageIndex) ||
+      pageIndex < 0
+    )
+      throw new Error("Invalid search pagination.");
+    const key = JSON.stringify([path, params.searchQuery]);
+    let session = this.searchSessions.get(key);
+    if (
+      session &&
+      (session.expiresAt <= Date.now() ||
+        (params.searchRequestId && params.searchRequestId !== session.requestId) ||
+        (!params.searchRequestId && pageIndex === 0))
+    )
+      session = undefined;
+    if (!session) {
+      const requestId = params.searchRequestId || randomUUID();
+      const first = await this.request(path, schema, {
+        method: "POST",
+        body: { searchRequestId: requestId, pageIndex: 0, searchQuery: params.searchQuery },
+      });
+      // A nonempty first batch reveals the website's native size (currently 100
+      // for free-text searches). Empty results never require another native page.
+      session = {
+        expiresAt: Date.now() + 5 * 60_000,
+        requestId: first.value.searchRequestId || requestId,
+        first,
+        nativeSize: first.value.data.length || 1,
+        pages: new Map([[0, first]]),
+      };
+      if (this.searchSessions.size >= 32)
+        this.searchSessions.delete(this.searchSessions.keys().next().value!);
+      this.searchSessions.set(key, session);
+    }
+    const first = session.first as z.infer<S>;
+    const fetchNative = async (index: number): Promise<z.infer<S>> => {
+      let result = session.pages.get(index) as z.infer<S> | undefined;
+      if (!result) {
+        result = await this.request(path, schema, {
+          method: "POST",
+          body: {
+            searchRequestId: session.requestId,
+            pageIndex: index,
+            searchQuery: params.searchQuery,
+          },
+        });
+        session.pages.set(index, result);
+        if (session.pages.size > 8) {
+          const oldest = [...session.pages.keys()].find((page) => page !== 0 && page !== index);
+          if (oldest !== undefined) session.pages.delete(oldest);
+        }
+      }
+      return result!;
+    };
+    const offset = pageIndex * pageSize;
+    let nativePage = Math.floor(offset / session.nativeSize);
+    let start = offset % session.nativeSize;
+    const items: unknown[] = [];
+    let hasNextPage = false;
+    if (first.value.data.length && !(nativePage > 0 && first.value.hasNextPage === false)) {
+      while (items.length < pageSize) {
+        const result = await fetchNative(nativePage);
+        const rows = result.value.data;
+        if (!rows.length) {
+          hasNextPage = false;
+          break;
+        }
+        const take = rows.slice(start, start + pageSize - items.length);
+        items.push(...take);
+        const nativeHasMore = result.value.hasNextPage ?? rows.length === session.nativeSize;
+        hasNextPage = start + take.length < rows.length || nativeHasMore;
+        if (items.length >= pageSize) {
+          // Some account/search responses advertise more matches but return no
+          // further rows. Confirm a standard-search boundary before showing Next.
+          // Never prefetch Deep Search: it can consume the user's AI credits.
+          if (
+            nativeHasMore &&
+            start + take.length >= rows.length &&
+            (params.searchQuery as { mode?: string }).mode !== "deep"
+          ) {
+            hasNextPage = (await fetchNative(nativePage + 1)).value.data.length > 0;
+          }
+          break;
+        }
+        if (!nativeHasMore) break;
+        nativePage++;
+        start = 0;
+      }
+    }
+    return {
+      ...first,
+      value: {
+        ...first.value,
+        searchRequestId: session.requestId,
+        data: items,
+        hasNextPage,
+        pageIndex,
+        pageSize,
+      },
+    } as z.infer<S>;
   }
 
   /**
@@ -134,18 +266,15 @@ export class MobbinApiClient {
     pageIndex?: number;
     sortBy?: string;
   }): Promise<ContentSearchResponse<AppResult>> {
-    return this.request("/api/search/fetch-search-page-apps", searchAppsResponseSchema, {
-      method: "POST",
-      body: {
-        searchRequestId: "",
-        pageIndex: params.pageIndex ?? DEFAULT_PAGE_INDEX,
-        pageSize: params.pageSize ?? DEFAULT_PAGE_SIZE,
-        searchQuery: {
-          platform: params.platform,
-          type: "filters",
-          categories: params.appCategories ?? null,
-          sortBy: params.sortBy ?? "publishedAt",
-        },
+    return this.searchRequest("/api/search/fetch-search-page-apps", searchAppsResponseSchema, {
+      searchRequestId: "",
+      pageIndex: params.pageIndex ?? DEFAULT_PAGE_INDEX,
+      pageSize: params.pageSize ?? DEFAULT_PAGE_SIZE,
+      searchQuery: {
+        platform: params.platform,
+        type: "filters",
+        categories: params.appCategories ?? null,
+        sortBy: params.sortBy ?? "publishedAt",
       },
     });
   }
@@ -166,6 +295,9 @@ export class MobbinApiClient {
    */
   async searchScreens(params: {
     platform: string;
+    query?: string;
+    mode?: "standard" | "deep";
+    searchRequestId?: string;
     screenPatterns?: string[];
     screenElements?: string[];
     screenKeywords?: string[];
@@ -175,26 +307,45 @@ export class MobbinApiClient {
     pageIndex?: number;
     sortBy?: string;
   }): Promise<ContentSearchResponse<ScreenResult>> {
-    return this.request("/api/search/fetch-search-page-screens", searchScreensResponseSchema, {
-      method: "POST",
-      body: {
-        searchRequestId: "",
+    if (params.mode === "deep") {
+      if (!params.query) throw new Error("Deep Search requires query.");
+      const capabilities = await this.getAccountCapabilities();
+      if (capabilities.deepSearch === false)
+        throw new Error("Deep Search is not enabled for the signed-in Mobbin account.");
+    }
+    return this.searchRequest(
+      "/api/search/fetch-search-page-screens",
+      searchScreensResponseSchema,
+      {
+        searchRequestId: params.searchRequestId ?? "",
         pageIndex: params.pageIndex ?? DEFAULT_PAGE_INDEX,
         pageSize: params.pageSize ?? DEFAULT_PAGE_SIZE,
-        searchQuery: {
-          platform: params.platform,
-          type: "filters",
-          categories: params.appCategories ?? null,
-          screenElements: params.screenElements ?? null,
-          screenPatterns: params.screenPatterns ?? null,
-          textInScreenshotQuery: params.screenKeywords?.length
-            ? params.screenKeywords.join(" ")
-            : null,
-          hasAnimation: params.hasAnimation ? true : null,
-          sortBy: params.sortBy ?? "trending",
-        },
+        searchQuery: params.query
+          ? {
+              type: "free_text_search",
+              contentType: "screens",
+              platform: params.platform,
+              query: params.query,
+              mode: params.mode ?? "standard",
+              hasAnimation: params.hasAnimation ? true : null,
+              textInScreenshotQuery: params.screenKeywords?.length
+                ? params.screenKeywords.join(" ")
+                : null,
+            }
+          : {
+              platform: params.platform,
+              type: "filters",
+              categories: params.appCategories ?? null,
+              screenElements: params.screenElements ?? null,
+              screenPatterns: params.screenPatterns ?? null,
+              textInScreenshotQuery: params.screenKeywords?.length
+                ? params.screenKeywords.join(" ")
+                : null,
+              hasAnimation: params.hasAnimation ? true : null,
+              sortBy: params.sortBy ?? "trending",
+            },
       },
-    });
+    );
   }
 
   /**
@@ -208,27 +359,146 @@ export class MobbinApiClient {
    */
   async searchFlows(params: {
     platform: string;
+    query?: string;
+    searchRequestId?: string;
     flowActions?: string[];
     appCategories?: string[];
     pageSize?: number;
     pageIndex?: number;
     sortBy?: string;
   }): Promise<ContentSearchResponse<FlowResult>> {
-    return this.request("/api/search/fetch-search-page-flows", searchFlowsResponseSchema, {
-      method: "POST",
-      body: {
-        searchRequestId: "",
-        pageIndex: params.pageIndex ?? DEFAULT_PAGE_INDEX,
-        pageSize: params.pageSize ?? DEFAULT_PAGE_SIZE,
-        searchQuery: {
-          platform: params.platform,
-          type: "filters",
-          categories: params.appCategories ?? null,
-          flowActions: params.flowActions ?? null,
-          sortBy: params.sortBy ?? "trending",
-        },
-      },
+    return this.searchRequest("/api/search/fetch-search-page-flows", searchFlowsResponseSchema, {
+      searchRequestId: params.searchRequestId ?? "",
+      pageIndex: params.pageIndex ?? DEFAULT_PAGE_INDEX,
+      pageSize: params.pageSize ?? DEFAULT_PAGE_SIZE,
+      searchQuery: params.query
+        ? {
+            type: "free_text_search",
+            contentType: "flows",
+            platform: params.platform,
+            query: params.query,
+            mode: "standard",
+          }
+        : {
+            platform: params.platform,
+            type: "filters",
+            categories: params.appCategories ?? null,
+            flowActions: params.flowActions ?? null,
+            sortBy: params.sortBy ?? "trending",
+          },
     });
+  }
+
+  async getAccountCapabilities(): Promise<AccountCapabilities> {
+    if (this.capabilityCache && this.capabilityCache.expiresAt > Date.now())
+      return this.capabilityCache.value;
+    const response = await fetch(`${MOBBIN_BASE_URL}/saved`, {
+      headers: { Cookie: await this.auth.getCookieValue() },
+      signal: AbortSignal.timeout(45_000),
+    });
+    if (!response.ok)
+      throw new Error(`Could not inspect Mobbin account access (${response.status}).`);
+    const value = extractAccountCapabilities(await response.text());
+    if (value.deepSearch !== null) this.capabilityCache = { expiresAt: Date.now() + 60_000, value };
+    return value;
+  }
+
+  async getComments(params: { contentType: "screens" | "flows" | "sections"; contentId: string }) {
+    return this.request(
+      "/api/comments/fetch-comments",
+      z
+        .object({
+          value: z.object({ comments: z.array(z.record(z.string(), z.unknown())) }).passthrough(),
+        })
+        .passthrough(),
+      { method: "POST", body: params },
+    );
+  }
+
+  async searchSections(params: {
+    query?: string;
+    patterns?: string[];
+    categories?: string[];
+    styles?: string[];
+    pageSize?: number;
+    pageIndex?: number;
+    searchRequestId?: string;
+  }) {
+    return this.searchRequest(
+      "/api/search/fetch-search-page-sections",
+      searchSectionsResponseSchema,
+      {
+        searchRequestId: params.searchRequestId ?? "",
+        pageIndex: params.pageIndex ?? 0,
+        pageSize: params.pageSize ?? 24,
+        searchQuery: params.query
+          ? {
+              type: "free_text_search",
+              contentType: "sections",
+              query: params.query,
+              mode: "standard",
+              textInScreenshotQuery: null,
+              hasVideo: null,
+            }
+          : {
+              type: "filters",
+              categories: params.categories ?? null,
+              styles: params.styles ?? null,
+              pageAndSectionPatterns: params.patterns ?? null,
+              textInScreenshotQuery: null,
+              hasVideo: null,
+              sortBy: "publishedAt",
+            },
+      },
+    );
+  }
+
+  async addComment(params: {
+    contentType: "screens" | "flows" | "sections";
+    contentId: string;
+    text: string;
+    parentCommentId?: string;
+  }) {
+    const text = params.text.trim();
+    if (!text) throw new Error("Comment text cannot be empty.");
+    const contentPath =
+      params.contentType === "sections"
+        ? `/sites/sections/${encodeURIComponent(params.contentId)}`
+        : `/explore/${params.contentType}/${encodeURIComponent(params.contentId)}`;
+    return this.actions.invoke(
+      "actionCreateComment",
+      {
+        contentType: params.contentType,
+        contentId: params.contentId,
+        rawComment: text,
+        comment: {
+          version: 2,
+          json: {
+            type: "doc",
+            content: text.split(/\r?\n/).map((line) => ({
+              type: "paragraph",
+              ...(line ? { content: [{ type: "text", text: line }] } : {}),
+            })),
+          },
+        },
+        parentCommentId: params.parentCommentId ?? null,
+      },
+      contentPath,
+    );
+  }
+
+  async createCollection(params: { name: string; description: string; isPublic: boolean }) {
+    return this.actions.invoke("actionCreateNewCollection", params);
+  }
+  async saveContent(params: {
+    contentType: "screens" | "flows" | "sections";
+    contentIds: string[];
+    collectionId?: string;
+  }) {
+    return this.actions.invoke(
+      params.collectionId ? "actionSaveAndAddContentsToCollection" : "actionSaveContents",
+      params,
+    );
   }
 
   /**
@@ -320,8 +590,8 @@ export class MobbinApiClient {
    */
   async getCollectionContents(params: {
     collectionId: string;
-    contentType: "apps" | "screens" | "flows";
-    platformType: "mobile" | "web";
+    contentType: "apps" | "screens" | "flows" | "sections";
+    platformType: "mobile" | "web" | "sites";
     pageSize?: number;
     cursor?: CollectionCursor | null;
   }): Promise<{ items: CollectionItem[]; nextCursor: CollectionCursor | null }> {
@@ -361,6 +631,36 @@ export class MobbinApiClient {
         ? { lastCreatedAt: last.created_at, lastId: last.id }
         : null;
     return { items, nextCursor };
+  }
+
+  async getSavedContents(params: {
+    contentType: "apps" | "screens" | "flows" | "sections";
+    platformType: "mobile" | "web" | "sites";
+    pageSize: number;
+    cursor?: CollectionCursor;
+  }) {
+    const result = await this.request(
+      "/saved/api/fetch-saved-page-contents",
+      collectionContentsResponseSchema,
+      {
+        method: "POST",
+        body: {
+          contentType: params.contentType,
+          platformType: params.platformType,
+          paginationOptions: { keysetPagination: params.cursor ?? {}, pageSize: params.pageSize },
+        },
+      },
+    );
+    if (!result.value) throw new Error("Saved contents returned no data.");
+    const items = result.value.data,
+      last = items.at(-1);
+    return {
+      items,
+      nextCursor:
+        items.length === params.pageSize && last
+          ? { lastCreatedAt: last.created_at, lastId: last.id }
+          : null,
+    };
   }
 
   /**
@@ -478,6 +778,9 @@ export class MobbinApiClient {
       throw new Error(`Mobbin app page fetch failed: ${res.status} ${res.statusText} - ${path}`);
     }
     const html = await res.text();
+    const capabilities = extractAccountCapabilities(html);
+    if (capabilities.deepSearch !== null)
+      this.capabilityCache = { expiresAt: Date.now() + 60_000, value: capabilities };
 
     const payload = extractAppPagePayload(html, path, versionId);
     const flows = z.array(flowResultSchema).parse(payload[0].value);
@@ -702,6 +1005,34 @@ export class MobbinApiClient {
       .slice(0, maxColors)
       .map(([hex]) => hex);
   }
+}
+
+export interface AccountCapabilities {
+  deepSearch: boolean | null;
+  coreLibrary: boolean | null;
+  unlimitedCollections: boolean | null;
+  officialMcp: boolean | null;
+}
+
+export function extractAccountCapabilities(html: string): AccountCapabilities {
+  let stream = "";
+  for (const match of html.matchAll(/self\.__next_f\.push\(\[1,\s*"((?:[^"\\]|\\.)*)"\s*\]\)/g)) {
+    try {
+      stream += JSON.parse(`"${match[1]}"`);
+    } catch {
+      /* Ignore malformed chunks. */
+    }
+  }
+  const grant = (key: string): boolean | null => {
+    const match = stream.match(new RegExp(`"${key}":[{]"isGranted":(true|false)`));
+    return match ? match[1] === "true" : null;
+  };
+  return {
+    deepSearch: grant("ftsDeepSearch"),
+    coreLibrary: grant("coreLibrary"),
+    unlimitedCollections: grant("unlimitedCollections"),
+    officialMcp: grant("mcp"),
+  };
 }
 
 /**

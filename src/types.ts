@@ -60,6 +60,8 @@ export interface ContentSearchResponse<T> {
   value: {
     searchRequestId: string;
     data: T[];
+    hasNextPage?: boolean;
+    totalCount?: number | null;
   };
 }
 

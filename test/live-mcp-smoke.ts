@@ -20,9 +20,21 @@ try {
     (appScreens.inputSchema.properties?.include_restricted as { default: boolean }).default,
     true,
   );
-  console.log(`Discovered ${tools.length} MCP tools; restricted screens included by default.`);
+  assert.ok(tools.some((tool) => tool.name === "mobbin_search_sections"));
+  assert.ok(tools.some((tool) => tool.name === "mobbin_get_saved"));
+  assert.equal(
+    (appScreens._meta?.ui as { resourceUri: string })?.resourceUri,
+    "ui://mobbin-forge/gallery.html",
+  );
+  const gallery = await client.readResource({ uri: "ui://mobbin-forge/gallery.html" });
+  assert.equal(gallery.contents[0].mimeType, "text/html;profile=mcp-app");
+  console.log(
+    `Discovered ${tools.length} MCP tools; gallery resource and complete screen listings available.`,
+  );
   const call = async (name: string, args: Record<string, unknown>) => {
-    const result = await client.callTool({ name, arguments: args });
+    const result = await client.callTool({ name, arguments: args }, undefined, {
+      timeout: 120_000,
+    });
     assert.ok(!result.isError, JSON.stringify(result));
     return result;
   };
@@ -48,6 +60,17 @@ try {
   );
   assert.equal((last.match(/\*\*Screen URL\*\*/g) ?? []).length, total % 50 || 50);
   assert.ok(last.includes("RESTRICTED PREVIEW"));
+  const capabilities = await call("mobbin_get_capabilities", {});
+  console.log(`Deep Search access: ${capabilities.structuredContent?.deepSearch}`);
+  if (capabilities.structuredContent?.deepSearch === false) {
+    const denied = await client.callTool({
+      name: "mobbin_search_screens",
+      arguments: { query: "login", mode: "deep", page_size: 1 },
+    });
+    assert.equal(denied.isError, true);
+    assert.match(text(denied), /not enabled/);
+    console.log("Deep Search account-access guard passed without running a Deep Search.");
+  }
   const url = last.match(/\*\*Screen URL\*\*: (https:\/\/\S+)/)?.[1];
   assert.ok(url);
   const detail = await call("mobbin_get_screen_detail", { screen_url: url, extract_colors: true });
@@ -75,9 +98,32 @@ try {
     ["mobbin_popular_apps", { limit_per_category: 1 }],
     ["mobbin_list_collections", {}],
     ["mobbin_get_filters", { kind: "patterns" }],
+    ["mobbin_search_screens", { query: "banking onboarding with a progress bar", page_size: 2 }],
+    ["mobbin_search_flows", { query: "creating an account", page_size: 2 }],
+    ["mobbin_search_sections", { query: "pricing", page_size: 2 }],
+    ["mobbin_get_saved", { content_type: "sections", platform: "sites", page_size: 2 }],
+    ["mobbin_get_saved", { content_type: "screens", platform: "mobile", page_size: 2 }],
+    [
+      "mobbin_get_comments",
+      { content_type: "screens", content_id: "81b520ac-e864-4e64-bc18-f16caca3b124" },
+    ],
   ] as const) {
     const result = await call(name, args);
     assert.ok(text(result).length > 0);
+    if ("page_size" in args && args.page_size && result.structuredContent) {
+      const rows = result.structuredContent.items ?? result.structuredContent.flows;
+      if (Array.isArray(rows))
+        assert.ok(rows.length <= args.page_size, `${name} exceeded requested page_size`);
+    }
+    if (
+      (name === "mobbin_search_screens" || name === "mobbin_search_sections") &&
+      "query" in args
+    ) {
+      assert.ok(
+        (result.structuredContent!.items as unknown[]).length > 0,
+        `${name} returned no results for the known query`,
+      );
+    }
     console.log(`${name}: passed`);
   }
 } finally {

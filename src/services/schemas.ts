@@ -258,23 +258,86 @@ export const collectionItemAppSchema = z
   })
   .passthrough();
 
+export interface SectionResult {
+  [key: string]: unknown;
+  id: string;
+  type?: string;
+  restricted: boolean;
+  siteName: string;
+  imageUrl: string;
+  videoUrl?: string;
+  patterns?: string[];
+  page_and_section_patterns: string[];
+  cdnImgSources?: { src: string; [key: string]: unknown } | null;
+  cdnVideoSources?: {
+    poster?: { src: string; [key: string]: unknown };
+    source?: { url: string; [key: string]: unknown };
+    [key: string]: unknown;
+  } | null;
+  site_version?: {
+    site: { id?: string; name: string; [key: string]: unknown };
+    [key: string]: unknown;
+  };
+}
+
+/** Website-section rows use the site's snake_case data model. */
+export const sectionResultSchema: z.ZodType<SectionResult, unknown> = z
+  .object({
+    id: z.string(),
+    type: z.string().optional(),
+    restricted: z.boolean().optional().default(false),
+    cdnImgSources: z.object({ src: z.string() }).passthrough().nullable().optional(),
+    cdnVideoSources: z
+      .object({
+        poster: z.object({ src: z.string() }).passthrough().optional(),
+        source: z.object({ url: z.string() }).passthrough().optional(),
+      })
+      .passthrough()
+      .nullable()
+      .optional(),
+    site_version: z
+      .object({ site: z.object({ id: z.string().optional(), name: z.string() }).passthrough() })
+      .passthrough()
+      .optional(),
+    siteName: z.string().optional(),
+    patterns: z.array(z.string()).optional(),
+    page_and_section_patterns: z.array(z.string()).optional().default([]),
+  })
+  .passthrough()
+  .transform((section) => ({
+    ...section,
+    siteName: section.site_version?.site.name ?? section.siteName ?? "Website",
+    page_and_section_patterns: section.patterns ?? section.page_and_section_patterns,
+    imageUrl: section.cdnImgSources?.src ?? section.cdnVideoSources?.poster?.src ?? "",
+    videoUrl: section.cdnVideoSources?.source?.url,
+  }));
+
 export const collectionItemSchema = z
   .object({
     id: z.string(),
-    collection_id: z.string(),
+    collection_id: z.string().nullable().optional(),
     contentType: z.string(),
     created_at: z.string(),
-    updated_at: z.string(),
-    app_id: z.string().nullable(),
-    app_screen_id: z.string().nullable(),
-    app_flow_id: z.string().nullable(),
-    site_id: z.string().nullable(),
-    site_page_section_id: z.string().nullable(),
+    updated_at: z.string().optional(),
+    app_id: z.string().nullable().optional(),
+    app_screen_id: z.string().nullable().optional(),
+    app_flow_id: z.string().nullable().optional(),
+    site_id: z.string().nullable().optional(),
+    site_page_section_id: z.string().nullable().optional(),
     screen: collectionItemScreenSchema.optional(),
     flow: collectionItemFlowSchema.optional(),
     app: collectionItemAppSchema.optional(),
+    section: sectionResultSchema.optional(),
   })
-  .passthrough();
+  .passthrough()
+  .transform((item) => ({
+    ...item,
+    app_id: item.app_id ?? item.app?.id ?? null,
+    app_screen_id: item.app_screen_id ?? item.screen?.id ?? null,
+    app_flow_id: item.app_flow_id ?? item.flow?.id ?? null,
+    site_id: item.site_id ?? null,
+    site_page_section_id: item.site_page_section_id ?? item.section?.id ?? null,
+  }));
 
 /**
  * Successful response from `/collections/api/fetch-collection-contents`.
@@ -317,7 +380,9 @@ export const dictionaryCategorySchema = z
                 displayName: z.string(),
                 definition: z.string(),
                 hidden: z.boolean().optional(),
-                contentCounts: z.record(z.union([z.record(z.number()), z.number()])).nullable(),
+                contentCounts: z
+                  .record(z.string(), z.union([z.record(z.string(), z.number()), z.number()]))
+                  .nullable(),
               })
               .passthrough(),
           ),
@@ -344,7 +409,7 @@ const filterTagEntrySchema = z
     definition: z.string().optional(),
     hidden: z.boolean().optional(),
     contentCounts: z
-      .record(z.union([z.record(z.number()), z.number()]))
+      .record(z.string(), z.union([z.record(z.string(), z.number()), z.number()]))
       .nullable()
       .optional(),
   })
@@ -471,6 +536,8 @@ export const contentSearchResponseSchema = <T extends z.ZodTypeAny>(item: T) =>
         .object({
           searchRequestId: z.string(),
           data: z.array(item),
+          hasNextPage: z.boolean().optional(),
+          totalCount: z.number().nullable().optional(),
         })
         .passthrough(),
     })
@@ -486,9 +553,11 @@ export const searchScreensResponseSchema = contentSearchResponseSchema(screenRes
 export const searchFlowsResponseSchema = contentSearchResponseSchema(flowResultSchema);
 export const searchableAppsResponseSchema = valueResponseSchema(z.array(searchableAppSchema));
 export const popularAppsResponseSchema = valueResponseSchema(
-  z.record(z.array(popularAppEntrySchema)),
+  z.record(z.string(), z.array(popularAppEntrySchema)),
 );
 export const collectionsResponseSchema = valueResponseSchema(z.array(collectionSchema));
 export const dictionaryDefinitionsResponseSchema = valueResponseSchema(
   z.array(dictionaryCategorySchema),
 );
+
+export const searchSectionsResponseSchema = contentSearchResponseSchema(sectionResultSchema);
