@@ -34,6 +34,13 @@ try {
   );
   assert.ok(tools.some((tool) => tool.name === "mobbin_search_sections"));
   assert.ok(tools.some((tool) => tool.name === "mobbin_get_saved"));
+  assert.ok(tools.some((tool) => tool.name === "mobbin_search_visual_references"));
+  assert.ok(tools.some((tool) => tool.name === "mobbin_get_visual_comparison"));
+  assert.ok(
+    (await client.listPrompts()).prompts.some(
+      (prompt) => prompt.name === "mobbin_visual_reference_search",
+    ),
+  );
   assert.equal(
     (appScreens._meta?.ui as { resourceUri: string })?.resourceUri,
     "ui://mobbin-forge/gallery.html",
@@ -95,6 +102,14 @@ try {
   console.log(
     `MCP image response: ${metadata.width}×${metadata.height}, color extraction succeeded.`,
   );
+  const visualSource = await call("mobbin_prepare_visual_search", { image_base64: img.data });
+  assert.equal(
+    (visualSource.content as Array<{ type: string }>).filter((block) => block.type === "image")
+      .length,
+    1,
+  );
+  assert.equal((visualSource.structuredContent!.source as { kind: string }).kind, "inline_image");
+  console.log("Native visual-search tools/prompt and real screenshot preparation passed.");
   // Local-only research writes use an isolated temporary directory, never the user's records.
   const project = (
     await call("mobbin_set_project_profile", {

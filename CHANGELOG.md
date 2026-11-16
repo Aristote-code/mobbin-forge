@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 (2026-11-17)
+
+- Add native agent-driven screenshot reference search through three MCP tools and a reusable workflow prompt, without another AI API key or model service.
+- Prepare a local screenshot, inline image, trusted Mobbin image, or conversation-attachment handle. The calling agent inspects the source and supplies a structured visual brief.
+- Retrieve standard-search candidates across up to three queries, interleave and deduplicate results, and return labeled comparison batches with the source plus up to four candidate images.
+- Keep retrieval order explicitly unranked; require native agent vision to judge similarities and differences, with failed images and partial search errors preserved.
+- Bound screenshot imports, memory caches, and session handles; document local import roots, ephemeral sources, host-vision requirements, and the distinction from a catalog-wide visual index.
+- Add regression coverage for image input, native attachments, query-only retrieval, image association, failures/retries, session expiry/isolation, website sections, and MCP tools/prompts.
+
 ## 1.5.0 (2026-11-17)
 
 - Add eight local research tools for reusable project profiles, persistent benchmarks, ordered reference flows, cited findings, decisions, history, retrieval, and Markdown briefs.

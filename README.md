@@ -10,6 +10,16 @@ An MCP server that works with [Mobbin](https://mobbin.com) — search screens, b
 
 The local build includes the image-resolution fix from `ScreenClear-for-Mobbin-1.1.1`. Encrypted CDN previews are resolved to their original screenshot paths before download. Discovery preserves the opaque `enc` parameter, validates the returned screenshot path, and falls back to the supplied URL if lookup or download fails. Tiny placeholders are reported as errors rather than returned as screenshots.
 
+## Screenshot references in 1.6
+
+Give your coding agent a screenshot and ask: **“Find real screens like this. Prioritize the layout and components, inspect the candidate images, and explain the closest references.”**
+
+Three new MCP tools organize a native-vision workflow: prepare the screenshot, retrieve candidates from a visual brief, and return labeled comparison images. Claude, Codex, or another image-capable agent performs the visual analysis; this MCP does not call another AI provider. No additional AI API key is required, although normal agent usage and Mobbin account limits still apply.
+
+Screenshots already attached to a conversation can stay there. Local-file and inline-image inputs are also supported. The `mobbin_visual_reference_search` MCP prompt describes the workflow for clients that expose prompts.
+
+This retrieves candidates with standard text search and then lets the agent compare their images. It is not an independent visual index of the entire Mobbin catalog. Retrieval order is not a similarity score, and image failures remain explicit. See [native visual search](docs/visual-search.md) for inputs, limits, and verification.
+
 ## Research workflows in 1.5
 
 Benchmark any product or a general design question directly from your MCP client. No separate website, browser package, or additional AI API key is required. The MCP stores evidence and builds comparison packets; your existing coding agent inspects references and writes the analysis.
@@ -22,7 +32,7 @@ Benchmark any product or a general design question directly from your MCP client
 
 Example: “Compare three onboarding flows against clarity and required effort. Save the source references, record what you actually inspected, and prepare a brief with a proposed change and a hypothesis to test.”
 
-References and capture metadata are supplied by the calling agent. Inspection is an agent attestation, not independent server verification. The server does not infer absent screens, calculate UX quality scores, prove conversion improvements, run experiments, or autonomously conduct research. Missing stages mean **not provided**. Screenshot similarity and competitor change monitoring remain future work.
+References and capture metadata are supplied by the calling agent. Inspection is an agent attestation, not independent server verification. The server does not infer absent screens, calculate UX quality scores, prove conversion improvements, run experiments, or autonomously conduct research. Missing stages mean **not provided**. A catalog-wide visual index and competitor change monitoring remain future work.
 
 See [research tool inputs and workflow](docs/research-workflows.md) and [Agent Browser versus Playwright](docs/browser-tooling.md).
 
