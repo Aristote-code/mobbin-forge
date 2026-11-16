@@ -4,11 +4,23 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import sharp from "sharp";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
+const researchDirectory = await mkdtemp(path.join(tmpdir(), "mobbin-live-research-"));
 const transport = new StdioClientTransport({
   command: process.execPath,
   args: [fileURLToPath(new URL("../dist/index.js", import.meta.url))],
   stderr: "pipe",
+  env: {
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(
+        (entry): entry is [string, string] => entry[1] !== undefined,
+      ),
+    ),
+    MOBBIN_RESEARCH_DIR: researchDirectory,
+  },
 });
 const client = new Client({ name: "mobbin-live-smoke", version: "1.0.0" });
 try {
@@ -83,6 +95,57 @@ try {
   console.log(
     `MCP image response: ${metadata.width}×${metadata.height}, color extraction succeeded.`,
   );
+  // Local-only research writes use an isolated temporary directory, never the user's records.
+  const project = (
+    await call("mobbin_set_project_profile", {
+      name: "Live research verification",
+      audience: "Example users",
+      goals: ["Verify evidence-backed research"],
+    })
+  ).structuredContent!.project as { id: string };
+  const benchmark = (
+    await call("mobbin_create_benchmark", {
+      project_id: project.id,
+      title: "Live image reference",
+      question: "Can a live reference be retained?",
+      criteria: [
+        { key: "evidence", label: "Evidence", question: "Does the source remain linked?" },
+      ],
+    })
+  ).structuredContent!.benchmark as { id: string };
+  await call("mobbin_add_benchmark_reference", {
+    benchmark_id: benchmark.id,
+    expected_revision: 1,
+    label: "Live screen",
+    product: "Duolingo",
+    platform: "ios",
+    source_kind: "mobbin_screen",
+    source_url: "https://mobbin.com",
+    captured_by: "mobbin",
+    steps: [{ label: "Screen", stage: "Unclassified", source_url: url, image_url: url }],
+  });
+  await call("mobbin_record_benchmark_finding", {
+    benchmark_id: benchmark.id,
+    expected_revision: 2,
+    kind: "hypothesis",
+    confidence: "low",
+    text: "A product comparison needs additional references and actual visual inspection.",
+  });
+  const packet = await call("mobbin_get_benchmark", { benchmark_id: benchmark.id });
+  assert.equal((packet.structuredContent!.active_findings as unknown[]).length, 1);
+  assert.match(
+    text(await call("mobbin_get_benchmark", { benchmark_id: benchmark.id, format: "markdown" })),
+    /Duolingo/,
+  );
+  await call("mobbin_delete_research", {
+    kind: "benchmarks",
+    id: benchmark.id,
+    expected_revision: 3,
+  });
+  await call("mobbin_delete_research", { kind: "projects", id: project.id, expected_revision: 1 });
+  console.log(
+    "Local project, live reference, research memory, comparison packet, export, and cleanup passed.",
+  );
   const flows = text(await call("mobbin_get_app_flows", { app_id: appId, page_size: 2 }));
   assert.match(flows, /https:\/\/(?:bytescale\.mobbin\.com|ujasntkfphywizsdaapi\.supabase\.co)\//);
   const unavailable = await client.callTool({
@@ -127,5 +190,9 @@ try {
     console.log(`${name}: passed`);
   }
 } finally {
-  await client.close();
+  try {
+    await client.close();
+  } finally {
+    await rm(researchDirectory, { recursive: true, force: true });
+  }
 }

@@ -6,9 +6,25 @@
 
 > The original mobbin-mcp is **archived and broken**. This fork fixes it.
 
-An MCP server that works with [Mobbin](https://mobbin.com) — 600k+ real app screens and flows from 1,100+ apps. Search screens, browse flows, grab palettes, build better UI without leaving Claude. Mobbin now offers an [official API and MCP](https://docs.mobbin.com/mcp/introduction). This independent server uses authenticated website routes instead.
+An MCP server that works with [Mobbin](https://mobbin.com) — search screens, browse flows, inspect images, and retain benchmarking research without leaving Codex or another MCP client. Mobbin also offers an [official API and MCP](https://docs.mobbin.com/mcp/introduction). This independent server uses authenticated website routes instead.
 
 The local build includes the image-resolution fix from `ScreenClear-for-Mobbin-1.1.1`. Encrypted CDN previews are resolved to their original screenshot paths before download. Discovery preserves the opaque `enc` parameter, validates the returned screenshot path, and falls back to the supplied URL if lookup or download fails. Tiny placeholders are reported as errors rather than returned as screenshots.
+
+## Research workflows in 1.5
+
+Benchmark any product or a general design question directly from your MCP client. No separate website, browser package, or additional AI API key is required. The MCP stores evidence and builds comparison packets; your existing coding agent inspects references and writes the analysis.
+
+- Save optional project profiles with an audience, goals, constraints, principles, and existing component names.
+- Retain ordered flows and source/image links from Mobbin, Playwright, Agent Browser, or manual research.
+- Align steps by explicit stage labels and compare findings against user-defined criteria.
+- Preserve cited observations, interpretations, hypotheses, preferences, adoption/rejection decisions, and proposed experiments.
+- Find prior research with keyword search and return a structured packet or an exportable Markdown brief.
+
+Example: “Compare three onboarding flows against clarity and required effort. Save the source references, record what you actually inspected, and prepare a brief with a proposed change and a hypothesis to test.”
+
+References and capture metadata are supplied by the calling agent. Inspection is an agent attestation, not independent server verification. The server does not infer absent screens, calculate UX quality scores, prove conversion improvements, run experiments, or autonomously conduct research. Missing stages mean **not provided**. Screenshot similarity and competitor change monitoring remain future work.
+
+See [research tool inputs and workflow](docs/research-workflows.md) and [Agent Browser versus Playwright](docs/browser-tooling.md).
 
 ## Independent 1.4 upgrade
 
@@ -117,7 +133,7 @@ npm run format:check
 npm run test:live
 ```
 
-`test:live` is an opt-in network check using your stored Mobbin session. A fresh cookie is required; authentication validates the session before saving it. It exercises the stdio MCP connection, app lookup, first and last screen pages, full-size image responses, colors, flows, search, popular apps, collections listing, filters, website sections, saved items, comment reads, and account-capability reporting. If Deep Search is unavailable, it verifies the denial without running a paid/credit-consuming search. It does not post comments, create collections, or download every screenshot in the catalog.
+`test:live` is an opt-in network check using your stored Mobbin session. A fresh cookie is required; authentication validates the session before saving it. It exercises the stdio MCP connection, app lookup, first and last screen pages, full-size image responses, colors, flows, search, popular apps, collections listing, filters, website sections, saved items, comment reads, and account-capability reporting. If Deep Search is unavailable, it verifies the denial without running a paid/credit-consuming search. It also creates and removes isolated temporary local research records using a live image reference. It does not post comments, create Mobbin collections, or download every screenshot in the catalog.
 
 ## Gallery preview
 

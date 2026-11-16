@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.0 (2026-11-17)
+
+- Add eight local research tools for reusable project profiles, persistent benchmarks, ordered reference flows, cited findings, decisions, history, retrieval, and Markdown briefs.
+- Keep project context optional and product-neutral. Existing benchmarks retain the profile revision used when they were created.
+- Accept reference links captured through Mobbin, Playwright, Agent Browser, or manual research without adding a production browser or AI API dependency.
+- Align comparison stages using supplied labels and record missing coverage as unknown; separate observations, interpretations, hypotheses, and preferences.
+- Preserve superseded findings; validate citations and inspection attestations; use revision checks, filesystem locks, atomic writes, and private local files.
+- Add research persistence, workspace separation, concurrent-edit, citation, export, and MCP workflow tests. Expand live verification with isolated local research records.
+- Document the browser-tool decision and the distinction between local installations for many users and a future authenticated shared service.
+
 ## 1.4.0 (2026-11-16)
 
 - Add standard free-text queries, website-section search, saved-item access, account capability reporting, and comment tools to the independent MCP.
