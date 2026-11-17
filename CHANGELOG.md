@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 (2026-11-17)
+
+- Add a SQLite-backed local vector library for up to 1,000 authorized screenshots and their ordered flow records.
+- Use pinned, quantized CLIP image/text encoders on the CPU through an optional Transformers.js dependency. Setup downloads weights once; normal inference loads local files with worker network fetches disabled.
+- Index whole images and top/middle/bottom or left/middle/right regions. Combine exact cosine retrieval with local keyword ranks, preserve source images/flow aliases, and report retrieval scores without treating them as match percentages.
+- Add four local-library MCP tools and a standalone `library serve` mode that does not require Mobbin authentication.
+- Add rights/provenance-aware manifests, immutable local image storage, deduplicated vectors, resumable embedding caches, atomic imports, and explicit replacement controls.
+- Provide a bounded Uni-GUI-OpenMobile pilot downloader with publisher-declared Apache 2.0 attribution, pinned dataset revision, checksum validation, and complete provided-trajectory selection.
+- Add library regression tests and an opt-in real-model/offline stdio acceptance check. Raise the Node minimum to 22.13 for built-in SQLite.
+
 ## 1.6.0 (2026-11-17)
 
 - Add native agent-driven screenshot reference search through three MCP tools and a reusable workflow prompt, without another AI API key or model service.

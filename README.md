@@ -10,6 +10,23 @@ An MCP server that works with [Mobbin](https://mobbin.com) — search screens, b
 
 The local build includes the image-resolution fix from `ScreenClear-for-Mobbin-1.1.1`. Encrypted CDN previews are resolved to their original screenshot paths before download. Discovery preserves the opaque `enc` parameter, validates the returned screenshot path, and falls back to the supplied URL if lookup or download fails. Tiny placeholders are reported as errors rather than returned as screenshots.
 
+## Local vector search in 1.7
+
+Build an authorized 1,000-screen pilot with real local image/text embeddings and preserved flow records. A pinned CLIP model runs on your CPU; SQLite stores images, region vectors, keyword text, and flow links. No paid AI API or database service is needed.
+
+The bundled downloader samples the publisher-licensed **Uni-GUI-OpenMobile** dataset, preserves complete provided trajectories and attribution, and deduplicates repeated screenshot files. It does not crawl Mobbin. Model setup and dataset downloads need internet; normal local inference uses cached files with network fetches disabled in the worker.
+
+```bash
+npm install --include=optional
+npm run build
+node dist/index.js library setup
+npm run pilot:download
+node dist/index.js library import "$HOME/.mobbin-mcp/pilot/openmobile/manifest.json"
+node dist/index.js library search calendar create event
+```
+
+Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the four local-library tools alongside the existing Mobbin tools. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
+
 ## Screenshot references in 1.6
 
 Give your coding agent a screenshot and ask: **“Find real screens like this. Prioritize the layout and components, inspect the candidate images, and explain the closest references.”**
@@ -74,7 +91,7 @@ The `restricted` flag describes Mobbin's preview; it does not establish whether 
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 22.13+
 - A [Mobbin](https://mobbin.com) account (free works)
 
 ### 1. Install & build

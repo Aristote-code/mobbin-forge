@@ -1,6 +1,6 @@
 {
   "name": "mobbin-forge",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "MCP server for searching and browsing Mobbin design inspiration",
   "type": "module",
   "main": "dist/index.js",
@@ -9,7 +9,8 @@
   },
   "files": [
     "dist",
-    "docs"
+    "docs",
+    "scripts/download-openmobile-pilot.mjs"
   ],
   "scripts": {
     "build": "node scripts/clean.mjs && tsc && node scripts/build-ui.mjs",
@@ -22,7 +23,9 @@
     "format:check": "prettier --check src/",
     "prepublishOnly": "npm run build",
     "test:live": "npm run build && tsx test/live-mcp-smoke.ts",
-    "preview:gallery": "npm run build && node scripts/preview-gallery.mjs"
+    "preview:gallery": "npm run build && node scripts/preview-gallery.mjs",
+    "pilot:download": "node scripts/download-openmobile-pilot.mjs",
+    "test:library:offline": "npm run build && node scripts/verify-local-library.mjs"
   },
   "keywords": [
     "mcp",
@@ -52,6 +55,9 @@
     "typescript-eslint": "^8.58.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "4.3.2"
   }
 }
