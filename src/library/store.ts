@@ -24,6 +24,7 @@ import {
   type EmbeddingEngine,
 } from "./schema.js";
 import { LocalEmbedder } from "./embedder.js";
+import { imageSimilarity } from "./ranking.js";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const hash = (value: Uint8Array | string) => createHash("sha256").update(value).digest("hex");
@@ -289,9 +290,14 @@ export class LocalLibrary {
     limit?: number;
     product?: string;
     platform?: string;
+    image_matching?: "balanced" | "layout";
   }) {
     if (Boolean(input.query?.trim()) === Boolean(input.image))
       throw Error("Supply exactly one text query or image.");
+    if (input.image_matching && !input.image)
+      throw Error("image_matching applies only to image queries.");
+    if (input.image_matching && !["balanced", "layout"].includes(input.image_matching))
+      throw Error("Unknown image matching strategy.");
     const limit = input.limit ?? 10;
     if (!Number.isInteger(limit) || limit < 1 || limit > 20)
       throw Error("Search limit must be 1–20.");
@@ -344,24 +350,8 @@ export class LocalLibrary {
       const scored = rows
         .map((row) => {
           const chunks = vectors.get(row.asset_hash)!;
-          const whole = chunks.find((chunk) => chunk.region === "full")!;
-          const full = cosine(queryVectors[0].vector, whole.vector);
-          const parts = queryVectors.slice(1);
-          const score = parts.length
-            ? 0.6 * full +
-              (0.4 *
-                parts.reduce(
-                  (sum, part) =>
-                    sum +
-                    Math.max(
-                      ...chunks
-                        .filter((chunk) => chunk.region !== "full")
-                        .concat(whole)
-                        .map((chunk) => cosine(part.vector, chunk.vector)),
-                    ),
-                  0,
-                )) /
-                parts.length
+          const score = input.image
+            ? imageSimilarity(queryVectors, chunks, input.image_matching)
             : Math.max(...chunks.map((chunk) => cosine(queryVectors[0].vector, chunk.vector)));
           return {
             ...row,
@@ -425,6 +415,7 @@ export class LocalLibrary {
       return {
         mode: input.image ? "local_image_vectors" : "local_text_vectors_and_keywords",
         results,
+        image_matching: input.image ? (input.image_matching ?? "balanced") : undefined,
         searched_screens: rows.length,
         model: MODEL,
         score_note:

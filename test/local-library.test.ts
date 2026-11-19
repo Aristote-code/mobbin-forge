@@ -244,7 +244,9 @@ test("library-only MCP serves actual screenshots, local search and paginated flo
   assert.equal((await call("mobbin_local_library_status", {})).structuredContent!.screens, 3);
   const found = await call("mobbin_search_local_library", {
     image_base64: blue.toString("base64"),
+    image_matching: "layout",
   });
+  assert.equal(found.structuredContent!.image_matching, "layout");
   assert.equal((found.structuredContent!.results as Array<{ id: string }>)[0].id, "blue");
   const image = await call("mobbin_get_local_screen", { screen_id: "blue" });
   assert.equal(

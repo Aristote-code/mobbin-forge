@@ -45,11 +45,12 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
     "mobbin_search_local_library",
     {
       description:
-        "Search the authorized local screenshot vector index with exactly one text query, local image_path, or raw image_base64. Local CPU CLIP embeddings use cached weights only; text search also uses local keywords. Image queries compare whole-screen and region vectors. Scores are retrieval signals, not match percentages. Returns IDs, source links, metadata, and associated flow IDs; inspect results with mobbin_get_local_screen. A conversation attachment is not readable by this tool: use an accessible image path/bytes or the agent's visual description as query.",
+        "Search the authorized local screenshot vector index with exactly one text query, local image_path, or raw image_base64. Local CPU CLIP embeddings use cached weights only; text search also uses local keywords. Image queries compare whole-screen and region vectors. Choose image_matching=layout to favor matching top/middle/bottom positions when spatial arrangement matters; balanced (default) tolerates rearranged components. Layout mode can improve some patterns but is not uniformly more relevant. Scores are retrieval signals, not match percentages. Returns IDs, source links, metadata, and associated flow IDs; inspect results with mobbin_get_local_screen. A conversation attachment is not readable by this tool: use an accessible image path/bytes or the agent's visual description as query.",
       inputSchema: {
         query: z.string().trim().min(1).max(500).optional(),
         image_path: z.string().max(4000).optional(),
         image_base64: z.string().max(28_000_000).optional(),
+        image_matching: z.enum(["balanced", "layout"]).optional(),
         limit: z.number().int().min(1).max(20).default(10),
         product: z.string().max(500).optional(),
         platform: z.enum(["ios", "android", "web", "other"]).optional(),
@@ -87,6 +88,7 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
         const result = await library.search({
           query: args.query,
           image,
+          image_matching: args.image_matching,
           limit: args.limit,
           product: args.product,
           platform: args.platform,

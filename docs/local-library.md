@@ -46,12 +46,12 @@ startup_timeout_sec = 20
 tool_timeout_sec = 120
 ```
 
-| Tool | Behavior |
-| --- | --- |
-| `mobbin_local_library_status` | Read dataset/model provenance, counts, and import time without loading the encoders. |
-| `mobbin_search_local_library` | Supply exactly one `query`, `image_path`, or `image_base64`; optional `product`, `platform`, and `limit` (1–20). |
-| `mobbin_get_local_screen` | Return the actual stored image inline, metadata, dimensions, and associated flow IDs. |
-| `mobbin_get_local_flow` | Read ordered steps/actions with `offset`/`limit` pagination; optional `include_images` returns up to three labeled screenshots from that page. |
+| Tool                          | Behavior                                                                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mobbin_local_library_status` | Read dataset/model provenance, counts, and import time without loading the encoders.                                                           |
+| `mobbin_search_local_library` | Supply exactly one `query`, `image_path`, or `image_base64`; optional `product`, `platform`, and `limit` (1–20).                               |
+| `mobbin_get_local_screen`     | Return the actual stored image inline, metadata, dimensions, and associated flow IDs.                                                          |
+| `mobbin_get_local_flow`       | Read ordered steps/actions with `offset`/`limit` pagination; optional `include_images` returns up to three labeled screenshots from that page. |
 
 Example requests:
 
@@ -87,22 +87,26 @@ Use a JSON manifest beside its screenshot files:
     "attribution": "Captured by the product owner",
     "rights_basis": "owned"
   },
-  "screens": [{
-    "id": "settings",
-    "image": "images/settings.png",
-    "title": "Settings",
-    "product": "My product",
-    "platform": "web",
-    "tags": ["settings"],
-    "text": "Optional provided OCR or annotation text"
-  }],
-  "flows": [{
-    "id": "configure-account",
-    "title": "Configure account",
-    "goal": "Review settings",
-    "complete": true,
-    "steps": [{"screen_id": "settings", "source_step": 0, "action": "Open settings"}]
-  }]
+  "screens": [
+    {
+      "id": "settings",
+      "image": "images/settings.png",
+      "title": "Settings",
+      "product": "My product",
+      "platform": "web",
+      "tags": ["settings"],
+      "text": "Optional provided OCR or annotation text"
+    }
+  ],
+  "flows": [
+    {
+      "id": "configure-account",
+      "title": "Configure account",
+      "goal": "Review settings",
+      "complete": true,
+      "steps": [{ "screen_id": "settings", "source_step": 0, "action": "Open settings" }]
+    }
+  ]
 }
 ```
 
@@ -119,3 +123,22 @@ Import creates a staging database and publishes it atomically after all records/
 Those unit tests do not establish real-model search quality. Acceptance checks should additionally use the downloaded encoders in offline mode, verify self-image retrieval, inspect representative text/image results, retrieve associated real flow sequences, and report exact screen/image/vector/flow counts. The pilot is a retrieval baseline for evaluation, not a claim of complete UI understanding.
 
 Sources: [dataset card](https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile), [CLIP ONNX model and MIT license](https://huggingface.co/Xenova/clip-vit-base-patch32), [Transformers.js local/offline configuration](https://huggingface.co/docs/transformers.js/api/env), [Node SQLite](https://nodejs.org/api/sqlite.html).
+
+## Measured screenshot matching
+
+Image search accepts `image_matching: "balanced" | "layout"`. The default remains
+`balanced`: 60% whole-screen similarity plus 40% best matching regions, allowing
+components to move. `layout` uses the same cached local embeddings but compares
+corresponding tile positions. Missing orientation tiles fall back to the whole
+view. It also uses only the whole view for square query images. No re-import,
+model download, or AI API is needed to switch modes. Text ranking is unchanged.
+
+Use `layout` when the arrangement of a reference screen matters. For exploratory
+inspiration, start with `balanced`. If results look wrong, compare both lists and
+inspect the returned images before recommending a reference; scores do not certify
+relevance. Task app labels and flow goals can describe a different app/state from
+the screen actually visible.
+
+The first 24-screen benchmark showed mixed held-out results, so layout is an
+explicit option, not a replacement default. See [the benchmark report](local-relevance-benchmark.md)
+for results, licenses, limitations, and reproduction commands.

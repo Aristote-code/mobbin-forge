@@ -25,7 +25,8 @@
     "test:live": "npm run build && tsx test/live-mcp-smoke.ts",
     "preview:gallery": "npm run build && node scripts/preview-gallery.mjs",
     "pilot:download": "node scripts/download-openmobile-pilot.mjs",
-    "test:library:offline": "npm run build && node scripts/verify-local-library.mjs"
+    "test:library:offline": "npm run build && node scripts/verify-local-library.mjs",
+    "benchmark:library": "npm run build && node scripts/benchmark-local-library.mjs"
   },
   "keywords": [
     "mcp",
