@@ -3,7 +3,9 @@ import { loadLocalImage, localPreview } from "./images.js";
 import type { LocalLibrary } from "./store.js";
 
 export const COMPARISON_GUIDANCE = [
+  "For inspiration across apps, use result_mode=app_diverse (one reference per app by default); use closest for strict similarity. Image diversity uses a default maximum cosine drop of 0.1; it may return fewer results. Increase max_similarity_drop only for broader exploration, then reject weak matches by inspection. App labels are imported metadata, not verified visual app recognition.",
   "Inspect SOURCE and every available CANDIDATE image before judging visual similarity.",
+  "If cross-app image retrieval returns too few useful references, describe the observed UI pattern and try mobbin_search_local_library with query and result_mode=app_diverse. Inspect that shortlist, then use explicit candidate_ids for comparison; never claim the server inferred the pattern or relax the gap without explaining broader exploration.",
   "Compare prominent UI pattern, layout hierarchy, controls, screen state, and visual style; separate observations from recommendations.",
   "Do not infer a match from app name, flow goal, colors or score alone. Failed images are uninspected and must not be ranked.",
   "Return the closest useful references with screen IDs, source links, observed similarities, material differences and flow IDs. Say when no strong match is visible.",
@@ -19,6 +21,9 @@ export async function compareLocalScreens(
     image_base64?: string;
     candidate_ids?: string[];
     image_matching?: "balanced" | "layout";
+    result_mode?: "closest" | "app_diverse";
+    max_per_app?: number;
+    max_similarity_drop?: number;
     product?: string;
     platform?: string;
     limit?: number;
@@ -43,6 +48,15 @@ export async function compareLocalScreens(
     (!Number.isInteger(input.limit) || input.limit < 1 || input.limit > 4)
   )
     throw Error("Comparison limit must be 1–4.");
+  if (
+    input.candidate_ids &&
+    (input.result_mode === "app_diverse" ||
+      input.max_per_app !== undefined ||
+      input.max_similarity_drop !== undefined)
+  )
+    throw Error(
+      "Diversity options apply only to automatic retrieval; explicit candidate IDs are preserved.",
+    );
   const sourceScreen = input.source_screen_id
     ? await library.screen(input.source_screen_id)
     : undefined;
@@ -55,6 +69,9 @@ export async function compareLocalScreens(
     : await library.search({
         image: bytes,
         image_matching: input.image_matching,
+        result_mode: input.result_mode,
+        max_per_app: input.max_per_app,
+        max_similarity_drop: input.max_similarity_drop,
         product: input.product,
         platform: input.platform,
         limit: input.limit ?? 4,

@@ -413,3 +413,141 @@ test("an unreadable auto-retrieved image is reported without losing the source",
   assert.equal(result.content.filter((block) => block.type === "image").length, 1);
   assert.equal(packet.source.screen_id, "red");
 });
+
+test("app diversity preserves closest mode, respects filters and counts pixel aliases only once", async (t) => {
+  const f = await fixture(t);
+  const next = {
+    ...manifest,
+    screens: [
+      ...Array.from({ length: 110 }, (_, i) => ({
+        ...manifest.screens[0],
+        id: `a${String(i).padStart(3, "0")}`,
+        product: i % 2 ? " Example A " : "EXAMPLE A",
+      })),
+      { ...manifest.screens[0], id: "b", product: "Example B" },
+      { ...manifest.screens[1], id: "c", product: "Example C" },
+    ],
+    flows: [],
+  };
+  await writeFile(f.filename, JSON.stringify(next));
+  await f.library.importManifest(f.filename);
+  const request = { query: "warning", deduplicate: false, limit: 4 };
+  const closest = await f.library.search(request);
+  assert.deepEqual(
+    closest.results.map((row) => row.id),
+    ["a000", "a001", "a002", "a003"],
+  );
+  assert.deepEqual(
+    (await f.library.search({ ...request, result_mode: "closest" })).results.map((row) => row.id),
+    closest.results.map((row) => row.id),
+  );
+  const diverse = await f.library.search({ ...request, result_mode: "app_diverse" });
+  assert.deepEqual(
+    diverse.results.map((row) => row.id),
+    ["a000", "b", "c"],
+  );
+  assert.equal(diverse.selection.returned_apps, 3);
+  assert.equal(diverse.results[0].cosine_similarity, closest.results[0].cosine_similarity);
+  const two = await f.library.search({ ...request, result_mode: "app_diverse", max_per_app: 2 });
+  assert.deepEqual(
+    two.results.map((row) => row.id),
+    ["a000", "a001", "b", "c"],
+  );
+  const filtered = await f.library.search({
+    ...request,
+    result_mode: "app_diverse",
+    product: "EXAMPLE A",
+  });
+  assert.equal(filtered.results.length, 1);
+  assert.equal(filtered.selection.available_apps, 1);
+  const grouped = await f.library.search({
+    query: "warning",
+    result_mode: "app_diverse",
+    limit: 4,
+  });
+  assert.deepEqual(
+    grouped.results.map((row) => row.id),
+    ["a000", "c"],
+  );
+  assert.ok(grouped.results[0].duplicate_screen_ids.includes("b"));
+  assert.equal(grouped.selection.returned_apps, 2);
+  await assert.rejects(
+    f.library.search({ query: "warning", max_per_app: 2 }),
+    /only to app_diverse/,
+  );
+  await assert.rejects(
+    f.library.search({ query: "warning", result_mode: "app_diverse", max_per_app: 0 }),
+    /1 or 2/,
+  );
+});
+
+test("comparison exposes app-diverse auto retrieval but preserves explicit shortlists", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const server = createLibraryServer(f.library);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(b);
+  const client = new Client({ name: "diversity-test", version: "1" });
+  await client.connect(a);
+  t.after(async () => {
+    await client.close();
+    await server.close();
+  });
+  const result = await client.callTool({
+    name: "mobbin_compare_local_screens",
+    arguments: { source_screen_id: "red", result_mode: "app_diverse", max_per_app: 2 },
+  });
+  assert.ok(!result.isError, JSON.stringify(result));
+  const packet = result.structuredContent! as any;
+  assert.equal(packet.retrieval.selection.result_mode, "app_diverse");
+  assert.equal(packet.retrieval.selection.max_per_app, 2);
+  assert.equal(packet.candidates[0].screen_id, "blue");
+  assert.equal(packet.candidates[0].flow_contexts[0].flow_id, "flow-a");
+  const search = await client.callTool({
+    name: "mobbin_search_local_library",
+    arguments: { query: "warning", result_mode: "app_diverse", max_per_app: 1 },
+  });
+  assert.ok(!search.isError, JSON.stringify(search));
+  assert.equal((search.structuredContent!.selection as any).returned_apps, 2);
+  await assert.rejects(
+    compareLocalScreens(f.library, {
+      source_screen_id: "red",
+      candidate_ids: ["blue"],
+      result_mode: "app_diverse",
+    }),
+    /explicit candidate IDs/,
+  );
+  const prompt = await client.getPrompt({
+    name: "mobbin_local_reference_comparison",
+    arguments: {
+      request: "Find cross-app patterns",
+      result_mode: "app_diverse",
+      source_screen_id: "red",
+    },
+  });
+  assert.match(JSON.stringify(prompt), /app_diverse/);
+});
+
+test("app-diverse image retrieval does not fill slots with candidates outside its similarity gap", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const guarded = await f.library.search({ image: red, result_mode: "app_diverse", limit: 4 });
+  assert.equal(guarded.results.length, 1);
+  assert.equal(guarded.selection.max_similarity_drop, 0.1);
+  assert.equal(guarded.selection.excluded_by_similarity, 1);
+  const broad = await f.library.search({
+    image: red,
+    result_mode: "app_diverse",
+    max_similarity_drop: 1,
+    limit: 4,
+  });
+  assert.equal(broad.results.length, 2);
+  await assert.rejects(
+    f.library.search({ image: red, max_similarity_drop: 0.2 }),
+    /only to app_diverse image/,
+  );
+  await assert.rejects(
+    f.library.search({ query: "red", result_mode: "app_diverse", max_similarity_drop: 0.2 }),
+    /only to app_diverse image/,
+  );
+});

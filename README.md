@@ -27,6 +27,8 @@ node dist/index.js library search calendar create event
 
 Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the five local-library tools alongside the existing Mobbin tools. Search groups repeated frames while retaining their IDs and flow links. `mobbin_compare_local_screens` returns a source, up to four labeled candidates, and adjacent flow steps for your agent to inspect locally. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
 
+For cross-app inspiration, set `result_mode: "app_diverse"` on local search or auto comparison. It prefers one reference per imported app label and uses a conservative similarity-gap guard for image queries. `closest` remains the default. A native agent can also describe the source's visible UI pattern, run a diverse text search, and compare that shortlist locally.
+
 ## Screenshot references in 1.6
 
 Give your coding agent a screenshot and ask: **“Find real screens like this. Prioritize the layout and components, inspect the candidate images, and explain the closest references.”**

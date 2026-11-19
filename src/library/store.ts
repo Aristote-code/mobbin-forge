@@ -27,6 +27,8 @@ import { LocalEmbedder } from "./embedder.js";
 import { imageSimilarity } from "./ranking.js";
 import { fingerprint, nearDuplicate, type Fingerprint } from "./deduplication.js";
 
+import { appKey, selectAppDiverse } from "./diversity.js";
+
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const hash = (value: Uint8Array | string) => createHash("sha256").update(value).digest("hex");
 const exists = async (filename: string) => {
@@ -295,6 +297,9 @@ export class LocalLibrary {
     platform?: string;
     image_matching?: "balanced" | "layout";
     deduplicate?: boolean;
+    result_mode?: "closest" | "app_diverse";
+    max_per_app?: number;
+    max_similarity_drop?: number;
     exclude_screen_id?: string;
   }) {
     if (Boolean(input.query?.trim()) === Boolean(input.image))
@@ -303,6 +308,18 @@ export class LocalLibrary {
       throw Error("image_matching applies only to image queries.");
     if (input.image_matching && !["balanced", "layout"].includes(input.image_matching))
       throw Error("Unknown image matching strategy.");
+    const resultMode = input.result_mode ?? "closest";
+    if (!["closest", "app_diverse"].includes(resultMode)) throw Error("Unknown result mode.");
+    if (input.max_per_app !== undefined && resultMode !== "app_diverse")
+      throw Error("max_per_app applies only to app_diverse mode.");
+    const maxPerApp = input.max_per_app ?? 1;
+    if (!Number.isInteger(maxPerApp) || maxPerApp < 1 || maxPerApp > 2)
+      throw Error("max_per_app must be 1 or 2.");
+    if (input.max_similarity_drop !== undefined && (resultMode !== "app_diverse" || !input.image))
+      throw Error("max_similarity_drop applies only to app_diverse image queries.");
+    const maxSimilarityDrop = input.max_similarity_drop ?? 0.1;
+    if (!Number.isFinite(maxSimilarityDrop) || maxSimilarityDrop < 0 || maxSimilarityDrop > 1)
+      throw Error("max_similarity_drop must be between 0 and 1.");
     const limit = input.limit ?? 10;
     if (!Number.isInteger(limit) || limit < 1 || limit > 20)
       throw Error("Search limit must be 1–20.");
@@ -348,9 +365,14 @@ export class LocalLibrary {
       }
       const rows = db
         .prepare(
-          `SELECT id,asset_hash,record FROM screens${filters.length ? ` WHERE ${filters.join(" AND ")}` : ""}`,
+          `SELECT id,asset_hash,product,record FROM screens${filters.length ? ` WHERE ${filters.join(" AND ")}` : ""}`,
         )
-        .all(...params) as Array<{ id: string; asset_hash: string; record: string }>;
+        .all(...params) as Array<{
+        id: string;
+        asset_hash: string;
+        product: string;
+        record: string;
+      }>;
       const vectors = new Map<string, ChunkVector[]>();
       for (const row of db.prepare("SELECT hash,region,vector FROM vectors").all() as Array<{
         hash: string;
@@ -408,7 +430,16 @@ export class LocalLibrary {
             a.id.localeCompare(b.id),
         );
       const enabled = input.deduplicate !== false;
-      const pool = ranked.slice(0, enabled ? Math.min(100, Math.max(40, limit * 5)) : limit);
+      // A global top-N window can contain only one app. Sample each app's ranked
+      // candidates first, then restore score order before grouping repeated pixels.
+      const eligible =
+        resultMode === "app_diverse" && input.image && ranked.length
+          ? ranked.filter((row) => row.cosine >= ranked[0].cosine - maxSimilarityDrop)
+          : ranked;
+      const pool =
+        resultMode === "app_diverse"
+          ? selectAppDiverse(eligible, (row) => row.product, 100, 100)
+          : ranked.slice(0, enabled ? Math.min(100, Math.max(40, limit * 5)) : limit);
       const groups: Array<{
         representative: (typeof ranked)[number];
         members: (typeof ranked)[number][];
@@ -453,7 +484,10 @@ export class LocalLibrary {
       }
       // Preserve every exact-file alias in the filtered corpus, even outside the candidate window.
       if (enabled) for (const row of ranked) byHash.get(row.asset_hash)?.members.push(row);
-      const selected = groups.slice(0, limit);
+      const selected =
+        resultMode === "app_diverse"
+          ? selectAppDiverse(groups, (group) => group.representative.product, limit, maxPerApp)
+          : groups.slice(0, limit);
       const results = selected.map((group) => {
         const row = group.representative;
 
@@ -485,6 +519,24 @@ export class LocalLibrary {
       return {
         mode: input.image ? "local_image_vectors" : "local_text_vectors_and_keywords",
         results,
+        selection: {
+          result_mode: resultMode,
+          max_per_app: resultMode === "app_diverse" ? maxPerApp : null,
+          available_apps: new Set(rows.map((row) => appKey(row.product))).size,
+          eligible_apps: new Set(eligible.map((row) => appKey(row.product))).size,
+          max_similarity_drop:
+            resultMode === "app_diverse" && input.image ? maxSimilarityDrop : null,
+          excluded_by_similarity: ranked.length - eligible.length,
+          candidate_apps: new Set(groups.map((group) => appKey(group.representative.product))).size,
+          returned_apps: new Set(selected.map((group) => appKey(group.representative.product)))
+            .size,
+          requested_limit: limit,
+          returned_count: selected.length,
+          note:
+            resultMode === "app_diverse"
+              ? "Best candidate per imported app label first, then second candidates if max_per_app=2 and slots remain. Strict cap; no same-app backfill. Pixel groups count only their representative app. Candidate sampling is bounded to 100 frames across apps. Image candidates must also lie within max_similarity_drop of the best cosine (default 0.1, uncalibrated heuristic). Diversity may reduce relevance; inspect images and source labels before making claims."
+              : "Closest score order with optional duplicate grouping; no per-app quota.",
+        },
         deduplication: {
           enabled,
           candidate_window: pool.length,

@@ -44,12 +44,15 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
     "mobbin_search_local_library",
     {
       description:
-        "Search the authorized local screenshot vector index with exactly one text query, local image_path, or raw image_base64. Local CPU CLIP embeddings use cached weights only; text search also uses local keywords. Image queries compare whole-screen and region vectors. Choose image_matching=layout to favor matching top/middle/bottom positions when spatial arrangement matters; balanced (default) tolerates rearranged components. Layout mode can improve some patterns but is not uniformly more relevant. Repeated files and conservative pixel near-duplicates are grouped by default, preserving duplicate_screen_ids and combined flow_ids; set deduplicate=false to inspect all ranked frames. Scores are retrieval signals, not match percentages. Returns IDs, source links, metadata, and associated flow IDs; inspect results with mobbin_get_local_screen. A conversation attachment is not readable by this tool: use an accessible image path/bytes or the agent's visual description as query.",
+        "Search the authorized local screenshot vector index with exactly one text query, local image_path, or raw image_base64. Local CPU CLIP embeddings use cached weights only; text search also uses local keywords. Image queries compare whole-screen and region vectors. Choose image_matching=layout to favor matching top/middle/bottom positions when spatial arrangement matters; balanced (default) tolerates rearranged components. Layout mode can improve some patterns but is not uniformly more relevant. Repeated files and conservative pixel near-duplicates are grouped by default, preserving duplicate_screen_ids and combined flow_ids; set deduplicate=false to inspect all ranked frames. Scores are retrieval signals, not match percentages. Use result_mode=app_diverse for inspiration across imported app labels (default max_per_app=1, optional 2); closest preserves score order. Diversity favors breadth and can return fewer results under its strict cap. Diverse image queries default to max_similarity_drop=0.1 from the best cosine; increase it for broader exploration. This uncalibrated gap is not a relevance guarantee; text search keeps hybrid ranks without the image gap. Returns IDs, source links, metadata, and associated flow IDs; inspect results with mobbin_get_local_screen. A conversation attachment is not readable by this tool: use an accessible image path/bytes or the agent's visual description as query.",
       inputSchema: {
         query: z.string().trim().min(1).max(500).optional(),
         image_path: z.string().max(4000).optional(),
         image_base64: z.string().max(28_000_000).optional(),
         image_matching: z.enum(["balanced", "layout"]).optional(),
+        result_mode: z.enum(["closest", "app_diverse"]).default("closest"),
+        max_per_app: z.number().int().min(1).max(2).optional(),
+        max_similarity_drop: z.number().min(0).max(1).optional(),
         deduplicate: z.boolean().default(true),
         limit: z.number().int().min(1).max(20).default(10),
         product: z.string().max(500).optional(),
@@ -69,6 +72,9 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
           query: args.query,
           image,
           image_matching: args.image_matching,
+          result_mode: args.result_mode,
+          max_per_app: args.max_per_app,
+          max_similarity_drop: args.max_similarity_drop,
           deduplicate: args.deduplicate,
           limit: args.limit,
           product: args.product,
@@ -84,13 +90,16 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
     "mobbin_compare_local_screens",
     {
       description:
-        "Return a labeled source image and up to four local candidate screenshots inline for native agent comparison, with source links and adjacent ordered flow steps. Supply exactly one source_screen_id, image_path or image_base64. Omit candidate_ids to retrieve deduplicated candidates automatically; pass IDs to inspect a specific search shortlist. Known library sources exclude their exact-file aliases from auto retrieval. The calling agent must inspect images and report similarities, differences and misses; this tool makes no AI API calls and does not claim a visual verdict. Failed candidate images and flow reads remain explicit. A conversation attachment requires an accessible local path/bytes.",
+        "Return a labeled source image and up to four local candidate screenshots inline for native agent comparison, with source links and adjacent ordered flow steps. Supply exactly one source_screen_id, image_path or image_base64. Omit candidate_ids to retrieve deduplicated candidates automatically; choose result_mode=app_diverse for different apps (max_per_app=1 by default, optionally 2), or closest for strict score order. App-diverse images use max_similarity_drop=0.1 by default; increase it for broader exploration. Fewer results are returned when no additional apps meet that uncalibrated gap. App diversity is based on imported product labels and still requires visual inspection; pass IDs to inspect a specific search shortlist. Known library sources exclude their exact-file aliases from auto retrieval. The calling agent must inspect images and report similarities, differences and misses; this tool makes no AI API calls and does not claim a visual verdict. Failed candidate images and flow reads remain explicit. A conversation attachment requires an accessible local path/bytes.",
       inputSchema: {
         source_screen_id: identifier.optional(),
         image_path: z.string().max(4000).optional(),
         image_base64: z.string().max(28_000_000).optional(),
         candidate_ids: z.array(identifier).min(1).max(4).optional(),
         image_matching: z.enum(["balanced", "layout"]).optional(),
+        result_mode: z.enum(["closest", "app_diverse"]).default("closest"),
+        max_per_app: z.number().int().min(1).max(2).optional(),
+        max_similarity_drop: z.number().min(0).max(1).optional(),
         product: z.string().max(500).optional(),
         platform: z.enum(["ios", "android", "web", "other"]).optional(),
         limit: z.number().int().min(1).max(4).default(4),
@@ -107,6 +116,7 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
         request: z.string().max(2000),
         image_path: z.string().max(4000).optional(),
         source_screen_id: identifier.optional(),
+        result_mode: z.enum(["closest", "app_diverse"]).optional(),
       },
     },
     (args) => ({

@@ -237,3 +237,101 @@ with grouping explicitly disabled, so the prior relevance baseline stays intact.
 Build, lint, formatting and 50 automated tests passed for this update, alongside
 the real stdio comparison check, the original 24-query scoring regression, and
 the separate 1,000-screen offline acceptance check.
+
+## App-diverse references
+
+Local search and automatic comparison now accept `result_mode`:
+
+- `closest` (default): retain the original score order and duplicate suppression.
+- `app_diverse`: choose the best candidate from each imported app label before
+  taking a second from any app. The default is a strict one-per-app cap;
+  `max_per_app: 2` allows a second when there are unfilled slots. The cap never
+  silently relaxes to fill the requested limit.
+
+For image queries, diverse mode also requires candidates to lie within
+`max_similarity_drop` of the highest-ranked image cosine, default **0.1**.
+Increase it (for example, to `0.2`) for broader exploration. This is an
+uncalibrated heuristic, not a probability or guarantee of relevance. It can
+return fewer references or just one app when the library lacks close alternatives.
+The gap is specific to diverse image queries; diverse text queries retain hybrid
+vector/keyword ranks without applying that image-score threshold.
+
+```json
+{
+  "source_screen_id": "your-local-screen-id",
+  "result_mode": "app_diverse",
+  "max_per_app": 1,
+  "limit": 4
+}
+```
+
+Send those arguments to `mobbin_compare_local_screens`. To recover the closest
+references, set `result_mode: "closest"` and omit the diversity-only options.
+For `mobbin_search_local_library`, supply an image or text query as usual.
+The MCP prompt also accepts `result_mode`.
+
+If image matching finds too few useful apps, the calling agent should inspect the
+source, describe its visible UI pattern, and submit an app-diverse text search.
+It can then pass the inspected shortlist as explicit `candidate_ids` to the
+comparison tool. Explicit IDs retain their requested order; diversity options are
+rejected for that fixed shortlist rather than silently modifying it.
+
+An inspected example, “analog time picker dialog with clock face and confirm
+cancel buttons,” retrieved real time-selection dialogs in **Clock, Simple Calendar
+Pro, Pro Expense and Tasks**. Their layout and controls match the pattern, with
+different surrounding forms, colors, and hour/minute states. That demonstration
+is not a held-out relevance benchmark or a general quality claim.
+
+### Selection behavior and limitations
+
+Filters and known-source exclusion apply first. For diverse image queries, the
+similarity gap applies next. Candidate sampling then considers apps across the
+whole filtered ranking, taking one candidate per app per round until at most 100
+frames have been selected; selected candidates retain their original score order.
+This prevents the first 100 rows from one dominant app from blocking all others.
+Pixel deduplication runs on that pool, followed by the strict app cap. With
+`deduplicate: false`, the diverse app cap still applies. Closest-mode candidate
+windows and scores are unchanged.
+
+App quotas use normalized `product` metadata (Unicode NFKC, whitespace and case).
+They are not visual app recognition. The pilot's task app labels sometimes differ
+from the app actually visible. Grouped pixel aliases count only as their
+representative app, even if other aliases have different product labels; they do
+not manufacture visual variety. Original IDs, source links and flow associations
+remain available.
+
+The `selection` diagnostics report requested mode, cap, available/eligible/returned
+app counts, image gap, excluded candidate count, and returned count. Image blocks
+and ordered flow contexts are returned exactly as in closest mode. The calling
+agent must reject weak matches and distinguish visible observations from metadata.
+
+### Verification
+
+Run `npm run test:library:diversity` against an existing local OpenMobile pilot and
+cached model. It exercises both modes through real MCP stdio, checks per-app caps,
+known-source exclusion, score order, image availability, flow context and product
+filters, and saves examples under ignored `output/verification/app-diversity/`.
+It also reproduces the cross-app time-picker pattern search and explicit
+comparison. No Mobbin authentication, paid AI API, database service, new model, or
+index migration is needed.
+
+On the known task-picker, color-picker and music-dashboard examples, broad
+exploration (`max_similarity_drop: 0.2`) returned four imported app labels; native
+inspection found weak alternatives in the task and music lists. The default gap
+reduced those examples to their closest app instead of forcing unrelated results.
+The existing 24-query scoring baseline remains reproducible with closest mode and
+deduplication disabled. These are regression checks on known examples, not fresh
+held-out evidence of improved relevance.
+
+The Tasks clock-dialog example also returned four app labels under the default
+image gap: Tasks, Clock, Pro Expense and Simple Calendar Pro. Native inspection
+confirmed time-selection controls in each, including analog and numeric variants.
+The selected screen IDs and their flow contexts are saved in the acceptance
+artifacts; their differences are meaningful references, not duplicate frames.
+
+Implementation validation: 55 automated tests pass, including dominant-app
+sampling, normalized caps, strict filter behavior, cross-label pixel aliases,
+closest-mode preservation, image-gap exclusion, MCP option forwarding, and
+explicit-shortlist preservation. Build, lint, formatting, the real local stdio
+checks, and the unchanged 24-query scoring baseline pass. No screenshots, models,
+or the SQLite library are included in the Git changes.
