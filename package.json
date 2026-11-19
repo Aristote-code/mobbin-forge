@@ -26,7 +26,8 @@
     "preview:gallery": "npm run build && node scripts/preview-gallery.mjs",
     "pilot:download": "node scripts/download-openmobile-pilot.mjs",
     "test:library:offline": "npm run build && node scripts/verify-local-library.mjs",
-    "benchmark:library": "npm run build && node scripts/benchmark-local-library.mjs"
+    "benchmark:library": "npm run build && node scripts/benchmark-local-library.mjs",
+    "test:library:comparison": "npm run build && node scripts/verify-local-comparison.mjs"
   },
   "keywords": [
     "mcp",

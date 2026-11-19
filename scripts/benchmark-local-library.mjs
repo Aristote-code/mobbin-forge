@@ -123,6 +123,7 @@ for (const q of spec.queries) {
     const actual = await library.search({
       image: await fs.readFile(out + "/" + q.image),
       image_matching: strategy,
+      deduplicate: false,
       limit: 5,
     });
     assert.deepEqual(

@@ -25,6 +25,7 @@ import {
 } from "./schema.js";
 import { LocalEmbedder } from "./embedder.js";
 import { imageSimilarity } from "./ranking.js";
+import { fingerprint, nearDuplicate, type Fingerprint } from "./deduplication.js";
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const hash = (value: Uint8Array | string) => createHash("sha256").update(value).digest("hex");
@@ -54,6 +55,7 @@ function readVector(bytes: Uint8Array) {
 export class LocalLibrary {
   readonly directory: string;
   private engine: EmbeddingEngine;
+  private fingerprints = new Map<string, Promise<Fingerprint>>();
   constructor(directory?: string, engine?: EmbeddingEngine) {
     this.directory = path.resolve(
       directory ?? process.env.MOBBIN_LIBRARY_DIR ?? path.join(homedir(), ".mobbin-mcp", "library"),
@@ -64,6 +66,7 @@ export class LocalLibrary {
     return path.join(this.directory, "library.sqlite");
   }
   async close() {
+    this.fingerprints.clear();
     await this.engine.close();
   }
   private database() {
@@ -291,6 +294,8 @@ export class LocalLibrary {
     product?: string;
     platform?: string;
     image_matching?: "balanced" | "layout";
+    deduplicate?: boolean;
+    exclude_screen_id?: string;
   }) {
     if (Boolean(input.query?.trim()) === Boolean(input.image))
       throw Error("Supply exactly one text query or image.");
@@ -332,6 +337,14 @@ export class LocalLibrary {
       if (input.platform) {
         filters.push("platform=?");
         params.push(input.platform);
+      }
+      if (input.exclude_screen_id) {
+        const source = db
+          .prepare("SELECT asset_hash FROM screens WHERE id=?")
+          .get(input.exclude_screen_id) as { asset_hash: string } | undefined;
+        if (!source) throw Error("Local source screen not found.");
+        filters.push("asset_hash!=?");
+        params.push(source.asset_hash);
       }
       const rows = db
         .prepare(
@@ -380,7 +393,7 @@ export class LocalLibrary {
           .filter((hit) => allowed.has(hit.screen_id))
           .forEach((hit, index) => textRanks.set(hit.screen_id, index + 1));
       }
-      const results = scored
+      const ranked = scored
         .map((row) => ({
           ...row,
           rank_score:
@@ -393,28 +406,93 @@ export class LocalLibrary {
             b.rank_score - a.rank_score ||
             b.cosine - a.cosine ||
             a.id.localeCompare(b.id),
-        )
-        .slice(0, limit)
-        .map((row) => {
-          const { text, ...record } = JSON.parse(row.record);
-          return {
-            ...record,
-            text_excerpt: String(text ?? "").slice(0, 500),
-            exact_file_match: row.exact_file_match,
-            cosine_similarity: row.cosine,
-            rank_score: row.rank_score,
-            flow_ids: (
-              db
-                .prepare(
-                  "SELECT DISTINCT flow_id FROM flow_steps WHERE screen_id=? ORDER BY flow_id",
-                )
-                .all(row.id) as Array<{ flow_id: string }>
-            ).map((value) => value.flow_id),
+        );
+      const enabled = input.deduplicate !== false;
+      const pool = ranked.slice(0, enabled ? Math.min(100, Math.max(40, limit * 5)) : limit);
+      const groups: Array<{
+        representative: (typeof ranked)[number];
+        members: (typeof ranked)[number][];
+        fingerprint?: Fingerprint;
+      }> = [];
+      const byHash = new Map<string, (typeof groups)[number]>();
+      const getFingerprint = async (assetHash: string) => {
+        let pending = this.fingerprints.get(assetHash);
+        if (!pending) {
+          const asset = db.prepare("SELECT bytes FROM assets WHERE hash=?").get(assetHash) as {
+            bytes: Uint8Array;
           };
-        });
+          pending = fingerprint(asset.bytes);
+          if (this.fingerprints.size >= 256)
+            this.fingerprints.delete(this.fingerprints.keys().next().value!);
+          this.fingerprints.set(assetHash, pending);
+          pending.catch(() => this.fingerprints.delete(assetHash));
+        }
+        return pending;
+      };
+      const fingerprintErrors: Array<{ screen_id: string; error: string }> = [];
+      for (const row of pool) {
+        if (enabled && byHash.has(row.asset_hash)) continue;
+        let visual: Fingerprint | undefined;
+        if (enabled) {
+          try {
+            visual = await getFingerprint(row.asset_hash);
+          } catch (error) {
+            fingerprintErrors.push({
+              screen_id: row.id,
+              error: error instanceof Error ? error.message : "Fingerprint unavailable",
+            });
+          }
+        }
+        const match = visual
+          ? groups.find((group) => group.fingerprint && nearDuplicate(group.fingerprint, visual!))
+          : undefined;
+        const group = match ?? { representative: row, members: [], fingerprint: visual };
+        if (!match) groups.push(group);
+        if (enabled) byHash.set(row.asset_hash, group);
+        else group.members.push(row);
+      }
+      // Preserve every exact-file alias in the filtered corpus, even outside the candidate window.
+      if (enabled) for (const row of ranked) byHash.get(row.asset_hash)?.members.push(row);
+      const selected = groups.slice(0, limit);
+      const results = selected.map((group) => {
+        const row = group.representative;
+
+        const { text, ...record } = JSON.parse(row.record);
+        return {
+          ...record,
+          text_excerpt: String(text ?? "").slice(0, 500),
+          exact_file_match: row.exact_file_match,
+          cosine_similarity: row.cosine,
+          rank_score: row.rank_score,
+          duplicate_screen_ids: group.members
+            .filter((member) => member.id !== row.id)
+            .map((member) => member.id),
+          flow_ids: [
+            ...new Set(
+              group.members.flatMap((member) =>
+                (
+                  db
+                    .prepare(
+                      "SELECT DISTINCT flow_id FROM flow_steps WHERE screen_id=? ORDER BY flow_id",
+                    )
+                    .all(member.id) as Array<{ flow_id: string }>
+                ).map((value) => value.flow_id),
+              ),
+            ),
+          ].sort(),
+        };
+      });
       return {
         mode: input.image ? "local_image_vectors" : "local_text_vectors_and_keywords",
         results,
+        deduplication: {
+          enabled,
+          candidate_window: pool.length,
+          unique_groups: groups.length,
+          fingerprint_errors: fingerprintErrors,
+          suppressed_in_window: enabled ? pool.length - groups.length : 0,
+          note: "Near-duplicate pixel heuristic, not semantic equivalence. No records deleted. IDs and flow references include grouped aliases. Disable deduplicate to inspect every ranked frame; grouping is bounded to the candidate window.",
+        },
         image_matching: input.image ? (input.image_matching ?? "balanced") : undefined,
         searched_screens: rows.length,
         model: MODEL,

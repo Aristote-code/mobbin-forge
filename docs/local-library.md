@@ -46,12 +46,13 @@ startup_timeout_sec = 20
 tool_timeout_sec = 120
 ```
 
-| Tool                          | Behavior                                                                                                                                       |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mobbin_local_library_status` | Read dataset/model provenance, counts, and import time without loading the encoders.                                                           |
-| `mobbin_search_local_library` | Supply exactly one `query`, `image_path`, or `image_base64`; optional `product`, `platform`, and `limit` (1–20).                               |
-| `mobbin_get_local_screen`     | Return the actual stored image inline, metadata, dimensions, and associated flow IDs.                                                          |
-| `mobbin_get_local_flow`       | Read ordered steps/actions with `offset`/`limit` pagination; optional `include_images` returns up to three labeled screenshots from that page. |
+| Tool                           | Behavior                                                                                                                                       |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mobbin_local_library_status`  | Read dataset/model provenance, counts, and import time without loading the encoders.                                                           |
+| `mobbin_search_local_library`  | Supply exactly one `query`, `image_path`, or `image_base64`; optional `product`, `platform`, and `limit` (1–20).                               |
+| `mobbin_compare_local_screens` | Return the source and up to four labeled candidates with adjacent flow context for native agent inspection.                                    |
+| `mobbin_get_local_screen`      | Return the actual stored image inline, metadata, dimensions, and associated flow IDs.                                                          |
+| `mobbin_get_local_flow`        | Read ordered steps/actions with `offset`/`limit` pagination; optional `include_images` returns up to three labeled screenshots from that page. |
 
 Example requests:
 
@@ -142,3 +143,97 @@ the screen actually visible.
 The first 24-screen benchmark showed mixed held-out results, so layout is an
 explicit option, not a replacement default. See [the benchmark report](local-relevance-benchmark.md)
 for results, licenses, limitations, and reproduction commands.
+
+## Group repeated search results
+
+Search now defaults to `deduplicate: true`. It keeps the highest-ranked frame in
+each group, returns its `duplicate_screen_ids`, and combines the group's `flow_ids`.
+The original screenshots, IDs and ordered flow steps are retained in the index;
+you can still open any grouped frame with `mobbin_get_local_screen`.
+
+Exact-file aliases are grouped, then conservative pixel checks identify near-identical
+frames. Pixel comparison ignores the top 3.5% system-status strip, checks aspect
+ratio, and compares a 96×192 RGB thumbnail. It requires mean channel difference
+at most 1/255, at most 0.3% changed pixels (channel difference >24/255), and no
+12×12 block with more than 10% changed pixels. The local block check protects
+small changes such as selected tabs. This is a heuristic: very fine text/control
+changes can still be grouped. It is not semantic equivalence or a state detector.
+
+Grouping operates after ranking and filters, within the first
+`min(100, max(40, limit * 5))` candidates. Exact-file aliases for the grouped hashes
+are collected across the filtered corpus. Returned diagnostics describe that window,
+not a global duplicate count. Some queries can return fewer than `limit` groups.
+Set `deduplicate: false` to recover the original ranked frames, or when comparing
+precise state changes. The 256-entry fingerprint cache is local and in memory;
+no database migration or model download is required.
+
+## Compare references with native agent vision
+
+Ask your image-capable agent:
+
+> Compare this local screenshot with useful references in my local library.
+> Inspect the images, explain the closest patterns and important differences,
+> and show the relevant flow steps.
+
+The agent can call `mobbin_compare_local_screens` once with exactly one
+`image_path`, `image_base64`, or `source_screen_id`. The source and up to four
+candidates are returned as labeled image blocks. Omit `candidate_ids` to search
+automatically with duplicate suppression; optional `image_matching`, `product`,
+`platform`, and `limit` (1–4) control that search. A known library source excludes
+all its exact-file aliases from auto retrieval.
+
+To compare an existing shortlist, pass one to four distinct `candidate_ids`.
+These explicit IDs are preserved; search filters and `limit` do not alter that
+shortlist. Each successful candidate includes source metadata and up to two
+representative-image flows, with the matching position and adjacent ordered steps.
+These are limited excerpts, not full trajectories. Action annotations in comparison
+excerpts are capped at 600 characters with an explicit truncation flag. `mobbin_get_local_flow` reads
+additional steps and other occurrences. Grouped aliases' flow IDs remain in the
+retrieval metadata, while comparison context is bound to the actual image shown.
+
+The `mobbin_local_reference_comparison` MCP prompt guides the agent through this
+workflow. Without a readable attachment path, the agent can describe the screenshot,
+run a text search, and inspect candidates with `mobbin_get_local_screen`.
+
+The server does not generate a visual verdict. It returns
+`visual_judgment: "pending_agent_inspection"`; your agent inspects the source and
+candidate images and reports observed similarities, differences, and missing
+matches. Failed candidate images are explicitly marked unavailable, with other
+images retained. Unreadable fingerprints leave the result ungrouped and report
+a diagnostic rather than hiding all search results. Failed flow reads preserve the candidate image and report missing
+context. Source annotations and image text remain untrusted data.
+
+Both tools run locally without another AI API, database service, or Mobbin login.
+The MCP reads local files and returns image blocks to your client. The calling
+agent processes those images under its normal model and data settings.
+Restart the MCP connection after rebuilding to load the new tool and prompt.
+
+### Validation
+
+`npm run test:library:comparison` exercises both search modes through a real stdio
+MCP subprocess against the existing 1,000-screen pilot and cached 24-screen
+regression set. It requires the benchmark screenshots already prepared by
+`npm run benchmark:library -- --download`.
+
+The checked run changed 11 of 24 four-result shortlists and suppressed 232 repeated
+candidate occurrences across 24 overlapping 40-frame windows. The top-ranked image
+was preserved in every query. These are repetition diagnostics, not counts of
+unique library duplicates or evidence of improved relevance. Eight new top-three
+candidate occurrences have no relevance judgment in the original fixture. This
+reused set is not a fresh held-out evaluation.
+
+Native inspection of grouped pairs caught a selected-tab distinction; the block
+check was added and the real stdio acceptance now requires those two screens to
+remain separate. Status-only and repeated-dashboard frames remain grouped. A
+color-picker comparison returned two actual color-selection dialogs, a partially
+related highlighting tool, and an unrelated feedback editor: the agent must still
+judge and reject weak references.
+
+Outputs (screenshots, comparison contact sheet, IDs, flow context, timings and
+JSON receipt) stay under ignored `output/verification/local-comparison/`.
+`npm run benchmark:library` continues to reproduce the original scoring comparison
+with grouping explicitly disabled, so the prior relevance baseline stays intact.
+
+Build, lint, formatting and 50 automated tests passed for this update, alongside
+the real stdio comparison check, the original 24-query scoring regression, and
+the separate 1,000-screen offline acceptance check.

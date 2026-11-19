@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, readFile, rm, symlink, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -9,6 +10,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LocalLibrary } from "../src/library/store.js";
 import { createLibraryServer } from "../src/library/cli.js";
+import { compareLocalScreens } from "../src/library/comparison.js";
 import { manifestSchema, MODEL, type EmbeddingEngine } from "../src/library/schema.js";
 
 const red = await sharp({ create: { width: 100, height: 200, channels: 3, background: "red" } })
@@ -139,7 +141,7 @@ test("local image/text vector search returns expected neighbors with keyword fus
   assert.ok(Math.abs(image.results[0].cosine_similarity - 1) < 1e-6);
   assert.equal((await f.library.search({ query: "blue settings" })).results[0].id, "blue");
   assert.deepEqual(
-    (await f.library.search({ query: "blue", product: "example a" })).results
+    (await f.library.search({ query: "blue", product: "example a", deduplicate: false })).results
       .map((row) => row.id)
       .sort(),
     ["red", "red-alias"],
@@ -240,7 +242,7 @@ test("library-only MCP serves actual screenshots, local search and paginated flo
     assert.ok(!result.isError, JSON.stringify(result));
     return result;
   };
-  assert.equal((await client.listTools()).tools.length, 4);
+  assert.equal((await client.listTools()).tools.length, 5);
   assert.equal((await call("mobbin_local_library_status", {})).structuredContent!.screens, 3);
   const found = await call("mobbin_search_local_library", {
     image_base64: blue.toString("base64"),
@@ -248,6 +250,20 @@ test("library-only MCP serves actual screenshots, local search and paginated flo
   });
   assert.equal(found.structuredContent!.image_matching, "layout");
   assert.equal((found.structuredContent!.results as Array<{ id: string }>)[0].id, "blue");
+  const compared = await call("mobbin_compare_local_screens", {
+    source_screen_id: "red",
+    candidate_ids: ["blue", "missing"],
+  });
+  assert.equal(compared.structuredContent!.visual_judgment, "pending_agent_inspection");
+  assert.equal(
+    (compared.content as Array<{ type: string }>).filter((block) => block.type === "image").length,
+    2,
+  );
+  const prompt = await client.getPrompt({
+    name: "mobbin_local_reference_comparison",
+    arguments: { request: "Find useful references", source_screen_id: "red" },
+  });
+  assert.match(JSON.stringify(prompt), /Inspect SOURCE/);
   const image = await call("mobbin_get_local_screen", { screen_id: "blue" });
   assert.equal(
     (image.content as Array<{ type: string }>).filter((block) => block.type === "image").length,
@@ -275,4 +291,125 @@ test("library-only MCP serves actual screenshots, local search and paginated flo
   });
   assert.equal(bad.isError, true);
   assert.ok((await readFile(path.join(f.root, "index", "library.sqlite"))).length > 0);
+});
+
+test("deduplicated search preserves aliases, flow references, source exclusion and opt-out", async (t) => {
+  const f = await fixture(t);
+  const withAliasFlow = {
+    ...manifest,
+    flows: [
+      ...manifest.flows,
+      {
+        ...manifest.flows[0],
+        id: "alias-flow",
+        steps: [{ screen_id: "red-alias", source_step: 0, action: "Alias" }],
+      },
+    ],
+  };
+  await writeFile(f.filename, JSON.stringify(withAliasFlow));
+  await f.library.importManifest(f.filename);
+  const result = await f.library.search({ image: red });
+  assert.equal(result.results.length, 2);
+  assert.equal(result.results[0].id, "red");
+  assert.deepEqual(result.results[0].duplicate_screen_ids, ["red-alias"]);
+  assert.deepEqual(result.results[0].flow_ids, ["alias-flow", "flow-a"]);
+  assert.equal(result.deduplication.suppressed_in_window, 1);
+  assert.equal((await f.library.search({ image: red, deduplicate: false })).results.length, 3);
+  const excluded = await f.library.search({ image: red, exclude_screen_id: "red" });
+  assert.deepEqual(
+    excluded.results.map((row) => row.id),
+    ["blue"],
+  );
+  assert.equal((await f.library.status()).screens, 3);
+  assert.equal((await f.library.flow("flow-a")).flow.steps.length, 3);
+});
+
+test("local comparison retrieves alternatives, binds labels to images and includes ordered flow context", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const result = await compareLocalScreens(f.library, { source_screen_id: "red", limit: 4 });
+  const packet = result.structuredContent! as any;
+  assert.equal(packet.candidates.length, 1);
+  assert.equal(packet.candidates[0].screen_id, "blue");
+  assert.equal(packet.candidates[0].flow_contexts[0].matching_position, 1);
+  assert.deepEqual(
+    packet.candidates[0].flow_contexts[0].steps.map((s: any) => s.position),
+    [0, 1, 2],
+  );
+  assert.equal(packet.visual_judgment, "pending_agent_inspection");
+  assert.equal(result.content.filter((block) => block.type === "image").length, 2);
+  const labels = result.content.filter((block) => block.type === "text").map((block) => block.text);
+  assert.ok(labels.includes("SOURCE: red"));
+  assert.ok(labels.includes("CANDIDATE 1: blue"));
+  const provided = await compareLocalScreens(f.library, {
+    image_base64: red.toString("base64"),
+    candidate_ids: ["blue", "missing"],
+  });
+  assert.equal((provided.structuredContent!.candidates as any[])[1].image_status, "unavailable");
+  assert.equal(provided.content.filter((block) => block.type === "image").length, 2);
+  await assert.rejects(
+    compareLocalScreens(f.library, {
+      image_base64: red.toString("base64"),
+      source_screen_id: "red",
+    }),
+    /exactly one/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, { source_screen_id: "red", candidate_ids: ["red"] }),
+    /cannot also/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, { source_screen_id: "red", candidate_ids: ["blue", "blue"] }),
+    /distinct/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, {
+      image_base64: Buffer.from("invalid").toString("base64"),
+      candidate_ids: ["blue"],
+    }),
+  );
+});
+
+test("a failed flow read keeps the comparison image and reports missing context", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  f.library.flow = async () => {
+    throw Error("Flow unavailable for test");
+  };
+  const result = await compareLocalScreens(f.library, {
+    source_screen_id: "red",
+    candidate_ids: ["blue"],
+  });
+  const candidate = (result.structuredContent!.candidates as any[])[0];
+  assert.equal(candidate.image_status, "available");
+  assert.equal(candidate.flow_contexts.length, 0);
+  assert.equal(candidate.flow_errors[0].error, "Flow unavailable for test");
+  assert.equal(result.content.filter((block) => block.type === "image").length, 2);
+  await assert.rejects(
+    compareLocalScreens(f.library, { image_path: "relative.png", candidate_ids: ["blue"] }),
+    /absolute/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, { source_screen_id: "red", limit: 5 }),
+    /limit/,
+  );
+});
+
+test("an unreadable auto-retrieved image is reported without losing the source", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const db = new DatabaseSync(path.join(f.root, "index", "library.sqlite"));
+  try {
+    db.prepare(
+      "UPDATE assets SET bytes=? WHERE hash=(SELECT asset_hash FROM screens WHERE id='blue')",
+    ).run(Buffer.from("damaged image"));
+  } finally {
+    db.close();
+  }
+  const result = await compareLocalScreens(f.library, { source_screen_id: "red" });
+  const packet = result.structuredContent! as any;
+  assert.equal(packet.candidates[0].image_status, "unavailable");
+  assert.equal(packet.retrieval.deduplication.fingerprint_errors.length, 1);
+  assert.equal(result.content.filter((block) => block.type === "image").length, 1);
+  assert.equal(packet.source.screen_id, "red");
 });

@@ -25,7 +25,7 @@ node dist/index.js library import "$HOME/.mobbin-mcp/pilot/openmobile/manifest.j
 node dist/index.js library search calendar create event
 ```
 
-Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the four local-library tools alongside the existing Mobbin tools. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
+Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the five local-library tools alongside the existing Mobbin tools. Search groups repeated frames while retaining their IDs and flow links. `mobbin_compare_local_screens` returns a source, up to four labeled candidates, and adjacent flow steps for your agent to inspect locally. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
 
 ## Screenshot references in 1.6
 

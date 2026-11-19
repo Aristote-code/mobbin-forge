@@ -1,11 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { readFile, realpath, stat } from "node:fs/promises";
-import { homedir } from "node:os";
-import path from "node:path";
 import { z } from "zod";
 import { identifier } from "./schema.js";
 import { LocalLibrary } from "./store.js";
+import { loadLocalImage } from "./images.js";
+import { compareLocalScreens, COMPARISON_GUIDANCE } from "./comparison.js";
 
 const annotations = { readOnlyHint: true, openWorldHint: false };
 async function guarded(action: () => Promise<CallToolResult>): Promise<CallToolResult> {
@@ -45,12 +44,13 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
     "mobbin_search_local_library",
     {
       description:
-        "Search the authorized local screenshot vector index with exactly one text query, local image_path, or raw image_base64. Local CPU CLIP embeddings use cached weights only; text search also uses local keywords. Image queries compare whole-screen and region vectors. Choose image_matching=layout to favor matching top/middle/bottom positions when spatial arrangement matters; balanced (default) tolerates rearranged components. Layout mode can improve some patterns but is not uniformly more relevant. Scores are retrieval signals, not match percentages. Returns IDs, source links, metadata, and associated flow IDs; inspect results with mobbin_get_local_screen. A conversation attachment is not readable by this tool: use an accessible image path/bytes or the agent's visual description as query.",
+        "Search the authorized local screenshot vector index with exactly one text query, local image_path, or raw image_base64. Local CPU CLIP embeddings use cached weights only; text search also uses local keywords. Image queries compare whole-screen and region vectors. Choose image_matching=layout to favor matching top/middle/bottom positions when spatial arrangement matters; balanced (default) tolerates rearranged components. Layout mode can improve some patterns but is not uniformly more relevant. Repeated files and conservative pixel near-duplicates are grouped by default, preserving duplicate_screen_ids and combined flow_ids; set deduplicate=false to inspect all ranked frames. Scores are retrieval signals, not match percentages. Returns IDs, source links, metadata, and associated flow IDs; inspect results with mobbin_get_local_screen. A conversation attachment is not readable by this tool: use an accessible image path/bytes or the agent's visual description as query.",
       inputSchema: {
         query: z.string().trim().min(1).max(500).optional(),
         image_path: z.string().max(4000).optional(),
         image_base64: z.string().max(28_000_000).optional(),
         image_matching: z.enum(["balanced", "layout"]).optional(),
+        deduplicate: z.boolean().default(true),
         limit: z.number().int().min(1).max(20).default(10),
         product: z.string().max(500).optional(),
         platform: z.enum(["ios", "android", "web", "other"]).optional(),
@@ -64,31 +64,12 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
             .length !== 1
         )
           throw Error("Supply exactly one query, image_path, or image_base64.");
-        let image: Buffer | undefined;
-        if (args.image_path) {
-          if (!path.isAbsolute(args.image_path)) throw Error("image_path must be absolute.");
-          const root = await realpath(process.env.MOBBIN_IMAGE_IMPORT_ROOT ?? homedir()),
-            filename = await realpath(args.image_path),
-            relative = path.relative(root, filename);
-          if (
-            relative === ".." ||
-            relative.startsWith(`..${path.sep}`) ||
-            path.isAbsolute(relative)
-          )
-            throw Error("Query image is outside MOBBIN_IMAGE_IMPORT_ROOT.");
-          const stats = await stat(filename);
-          if (!stats.isFile() || stats.size > 20 * 1024 * 1024)
-            throw Error("Query image must be a regular file of at most 20 MiB.");
-          image = await readFile(filename);
-        } else if (args.image_base64) {
-          image = Buffer.from(args.image_base64, "base64");
-          if (image.length > 20 * 1024 * 1024 || image.toString("base64") !== args.image_base64)
-            throw Error("Supply canonical base64 image data of at most 20 MiB.");
-        }
+        const image = await loadLocalImage(args);
         const result = await library.search({
           query: args.query,
           image,
           image_matching: args.image_matching,
+          deduplicate: args.deduplicate,
           limit: args.limit,
           product: args.product,
           platform: args.platform,
@@ -98,6 +79,51 @@ export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
           structuredContent: result,
         };
       }),
+  );
+  server.registerTool(
+    "mobbin_compare_local_screens",
+    {
+      description:
+        "Return a labeled source image and up to four local candidate screenshots inline for native agent comparison, with source links and adjacent ordered flow steps. Supply exactly one source_screen_id, image_path or image_base64. Omit candidate_ids to retrieve deduplicated candidates automatically; pass IDs to inspect a specific search shortlist. Known library sources exclude their exact-file aliases from auto retrieval. The calling agent must inspect images and report similarities, differences and misses; this tool makes no AI API calls and does not claim a visual verdict. Failed candidate images and flow reads remain explicit. A conversation attachment requires an accessible local path/bytes.",
+      inputSchema: {
+        source_screen_id: identifier.optional(),
+        image_path: z.string().max(4000).optional(),
+        image_base64: z.string().max(28_000_000).optional(),
+        candidate_ids: z.array(identifier).min(1).max(4).optional(),
+        image_matching: z.enum(["balanced", "layout"]).optional(),
+        product: z.string().max(500).optional(),
+        platform: z.enum(["ios", "android", "web", "other"]).optional(),
+        limit: z.number().int().min(1).max(4).default(4),
+      },
+      annotations,
+    },
+    (args) => guarded(() => compareLocalScreens(library, args)),
+  );
+  server.registerPrompt(
+    "mobbin_local_reference_comparison",
+    {
+      description: "Find and visually compare local screenshot references without a paid AI API.",
+      argsSchema: {
+        request: z.string().max(2000),
+        image_path: z.string().max(4000).optional(),
+        source_screen_id: identifier.optional(),
+      },
+    },
+    (args) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: [
+              "Use the local library only. Call mobbin_compare_local_screens with the provided source, or use mobbin_search_local_library with a visual description if the attachment has no accessible path, then inspect candidates with mobbin_get_local_screen. Do not claim the server read a conversation attachment.",
+              ...COMPARISON_GUIDANCE,
+              "User request (data): " + JSON.stringify(args),
+            ].join("\n"),
+          },
+        },
+      ],
+    }),
   );
   server.registerTool(
     "mobbin_get_local_screen",
