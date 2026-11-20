@@ -1,6 +1,6 @@
 {
   "name": "mobbin-forge",
-  "version": "1.4.0",
+  "version": "1.7.0",
   "description": "MCP server for searching and browsing Mobbin design inspiration",
   "type": "module",
   "main": "dist/index.js",
@@ -8,7 +8,9 @@
     "mobbin-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "docs",
+    "scripts/download-openmobile-pilot.mjs"
   ],
   "scripts": {
     "build": "node scripts/clean.mjs && tsc && node scripts/build-ui.mjs",
@@ -21,7 +23,15 @@
     "format:check": "prettier --check src/",
     "prepublishOnly": "npm run build",
     "test:live": "npm run build && tsx test/live-mcp-smoke.ts",
-    "preview:gallery": "npm run build && node scripts/preview-gallery.mjs"
+    "preview:gallery": "npm run build && node scripts/preview-gallery.mjs",
+    "pilot:download": "node scripts/download-openmobile-pilot.mjs",
+    "test:library:offline": "npm run build && node scripts/verify-local-library.mjs",
+    "benchmark:library": "npm run build && node scripts/benchmark-local-library.mjs",
+    "test:library:comparison": "npm run build && node scripts/verify-local-comparison.mjs",
+    "test:library:diversity": "npm run build && node scripts/verify-local-diversity.mjs",
+    "knowledge:pilot": "npm run build && node scripts/seed-ui-knowledge.mjs",
+    "catalog:build": "npm run build && node scripts/build-ui-catalog.mjs",
+    "catalog:verify": "npm run build && node scripts/verify-ui-catalog.mjs"
   },
   "keywords": [
     "mcp",
@@ -51,6 +61,9 @@
     "typescript-eslint": "^8.58.0"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "4.3.2"
   }
 }

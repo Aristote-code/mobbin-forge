@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.7.0 (2026-11-17)
+
+- Add a SQLite-backed local vector library for up to 1,000 authorized screenshots and their ordered flow records.
+- Use pinned, quantized CLIP image/text encoders on the CPU through an optional Transformers.js dependency. Setup downloads weights once; normal inference loads local files with worker network fetches disabled.
+- Index whole images and top/middle/bottom or left/middle/right regions. Combine exact cosine retrieval with local keyword ranks, preserve source images/flow aliases, and report retrieval scores without treating them as match percentages.
+- Add four local-library MCP tools and a standalone `library serve` mode that does not require Mobbin authentication.
+- Add rights/provenance-aware manifests, immutable local image storage, deduplicated vectors, resumable embedding caches, atomic imports, and explicit replacement controls.
+- Provide a bounded Uni-GUI-OpenMobile pilot downloader with publisher-declared Apache 2.0 attribution, pinned dataset revision, checksum validation, and complete provided-trajectory selection.
+- Add library regression tests and an opt-in real-model/offline stdio acceptance check. Raise the Node minimum to 22.13 for built-in SQLite.
+
+## 1.6.0 (2026-11-17)
+
+- Add native agent-driven screenshot reference search through three MCP tools and a reusable workflow prompt, without another AI API key or model service.
+- Prepare a local screenshot, inline image, trusted Mobbin image, or conversation-attachment handle. The calling agent inspects the source and supplies a structured visual brief.
+- Retrieve standard-search candidates across up to three queries, interleave and deduplicate results, and return labeled comparison batches with the source plus up to four candidate images.
+- Keep retrieval order explicitly unranked; require native agent vision to judge similarities and differences, with failed images and partial search errors preserved.
+- Bound screenshot imports, memory caches, and session handles; document local import roots, ephemeral sources, host-vision requirements, and the distinction from a catalog-wide visual index.
+- Add regression coverage for image input, native attachments, query-only retrieval, image association, failures/retries, session expiry/isolation, website sections, and MCP tools/prompts.
+
+## 1.5.0 (2026-11-17)
+
+- Add eight local research tools for reusable project profiles, persistent benchmarks, ordered reference flows, cited findings, decisions, history, retrieval, and Markdown briefs.
+- Keep project context optional and product-neutral. Existing benchmarks retain the profile revision used when they were created.
+- Accept reference links captured through Mobbin, Playwright, Agent Browser, or manual research without adding a production browser or AI API dependency.
+- Align comparison stages using supplied labels and record missing coverage as unknown; separate observations, interpretations, hypotheses, and preferences.
+- Preserve superseded findings; validate citations and inspection attestations; use revision checks, filesystem locks, atomic writes, and private local files.
+- Add research persistence, workspace separation, concurrent-edit, citation, export, and MCP workflow tests. Expand live verification with isolated local research records.
+- Document the browser-tool decision and the distinction between local installations for many users and a future authenticated shared service.
+
 ## 1.4.0 (2026-11-16)
 
 - Add standard free-text queries, website-section search, saved-item access, account capability reporting, and comment tools to the independent MCP.

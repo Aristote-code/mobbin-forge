@@ -1,0 +1,411 @@
+{
+  "source_dataset": "UI-MOPD/Uni-GUI-OpenMobile",
+  "source_revision": "774eb20f97724bf64faa9e66b1572f05b1688e38",
+  "attribution": "UI-MOPD / Uni-GUI-OpenMobile, publisher-declared Apache-2.0. Annotations authored from native visual inspection of the pinned local pilot; rights and source URLs are inherited when saved.",
+  "references": [
+    {
+      "patterns": ["time-selection", "modal-dialog"],
+      "components": [
+        {
+          "type": "time-picker",
+          "description": "A modal analog clock face with numeric time display and confirmation controls."
+        },
+        {
+          "type": "button-group",
+          "description": "Cancel and confirmation actions along the bottom of the modal."
+        }
+      ],
+      "observations": [
+        "The time selector appears in a centered modal over a dimmed underlying screen.",
+        "A circular dial, numeric time display, keyboard toggle and Cancel/OK controls are visible.",
+        "Dark teal surface, cyan selected hour and a 16:00 display."
+      ],
+      "interpretations": [
+        "An alternative presentation for selecting a time; the screenshot alone does not prove gesture behavior."
+      ],
+      "visual_details": [
+        {
+          "attribute": "layout",
+          "value": "Numeric display above a circular dial, with actions at the bottom.",
+          "basis": "observed"
+        },
+        {
+          "attribute": "typography",
+          "value": "Sans-serif with a large numeric time display; original font family and sizes are unknown.",
+          "basis": "estimated"
+        }
+      ],
+      "reference_id": "pilot-ui-v1-time-clock",
+      "screen_id": "screen-575ef2de79a884c0d0e3a97e62f9547f13387a2c8dddac2e7ee4cdd613f5dc36",
+      "crop": {
+        "x": 0.13,
+        "y": 0.24,
+        "width": 0.74,
+        "height": 0.55
+      },
+      "kind": "component",
+      "title": "Clock: dark analog time dialog",
+      "summary": "Clock: dark analog time dialog with a clock face, numeric display and explicit confirmation.",
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "patterns": ["time-selection", "modal-dialog"],
+      "components": [
+        {
+          "type": "time-picker",
+          "description": "A modal analog clock face with numeric time display and confirmation controls."
+        },
+        {
+          "type": "button-group",
+          "description": "Cancel and confirmation actions along the bottom of the modal."
+        }
+      ],
+      "observations": [
+        "The time selector appears in a centered modal over a dimmed underlying screen.",
+        "A circular dial, numeric time display, keyboard toggle and Cancel/OK controls are visible.",
+        "Light blue surface, blue selected hour and a 06:30 display."
+      ],
+      "interpretations": [
+        "An alternative presentation for selecting a time; the screenshot alone does not prove gesture behavior."
+      ],
+      "visual_details": [
+        {
+          "attribute": "layout",
+          "value": "Numeric display above a circular dial, with actions at the bottom.",
+          "basis": "observed"
+        },
+        {
+          "attribute": "typography",
+          "value": "Sans-serif with a large numeric time display; original font family and sizes are unknown.",
+          "basis": "estimated"
+        }
+      ],
+      "reference_id": "pilot-ui-v1-time-calendar",
+      "screen_id": "screen-44891001623f5c6515659972d621e01effbe546eaee9c038c8eb4818226b2edd",
+      "crop": {
+        "x": 0.13,
+        "y": 0.24,
+        "width": 0.74,
+        "height": 0.55
+      },
+      "kind": "component",
+      "title": "Calendar: light blue time dialog",
+      "summary": "Calendar: light blue time dialog with a clock face, numeric display and explicit confirmation.",
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "patterns": ["time-selection", "modal-dialog"],
+      "components": [
+        {
+          "type": "time-picker",
+          "description": "A modal analog clock face with numeric time display and confirmation controls."
+        },
+        {
+          "type": "button-group",
+          "description": "Cancel and confirmation actions along the bottom of the modal."
+        }
+      ],
+      "observations": [
+        "The time selector appears in a centered modal over a dimmed underlying screen.",
+        "A circular dial, numeric time display, keyboard toggle and Cancel/OK controls are visible.",
+        "Dark gray surface, a 12-hour dial, AM/PM indicators and a 3:35 display."
+      ],
+      "interpretations": [
+        "An alternative presentation for selecting a time; the screenshot alone does not prove gesture behavior."
+      ],
+      "visual_details": [
+        {
+          "attribute": "layout",
+          "value": "Numeric display above a circular dial, with actions at the bottom.",
+          "basis": "observed"
+        },
+        {
+          "attribute": "typography",
+          "value": "Sans-serif with a large numeric time display; original font family and sizes are unknown.",
+          "basis": "estimated"
+        }
+      ],
+      "reference_id": "pilot-ui-v1-time-expense",
+      "screen_id": "screen-9f80412085eb3edccf71bdcca4eec87ffa059c47760bff68ed8b57b1217ba7b3",
+      "crop": {
+        "x": 0.15,
+        "y": 0.296,
+        "width": 0.7,
+        "height": 0.435
+      },
+      "kind": "component",
+      "title": "Expense: dark 12-hour time dialog",
+      "summary": "Expense: dark 12-hour time dialog with a clock face, numeric display and explicit confirmation.",
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "patterns": ["time-selection", "modal-dialog"],
+      "components": [
+        {
+          "type": "time-picker",
+          "description": "A modal analog clock face with numeric time display and confirmation controls."
+        },
+        {
+          "type": "button-group",
+          "description": "Cancel and confirmation actions along the bottom of the modal."
+        }
+      ],
+      "observations": [
+        "The time selector appears in a centered modal over a dimmed underlying screen.",
+        "A circular dial, numeric time display, keyboard toggle and Cancel/OK controls are visible.",
+        "White surface, pink selected hour, gray clock face and a 12:00 display."
+      ],
+      "interpretations": [
+        "An alternative presentation for selecting a time; the screenshot alone does not prove gesture behavior."
+      ],
+      "visual_details": [
+        {
+          "attribute": "layout",
+          "value": "Numeric display above a circular dial, with actions at the bottom.",
+          "basis": "observed"
+        },
+        {
+          "attribute": "typography",
+          "value": "Sans-serif with a large numeric time display; original font family and sizes are unknown.",
+          "basis": "estimated"
+        }
+      ],
+      "reference_id": "pilot-ui-v1-time-tasks",
+      "screen_id": "screen-13152397accf4c119d6d62208f1f47ea9f2941548b357a17694d652312d6e1c1",
+      "crop": {
+        "x": 0.13,
+        "y": 0.24,
+        "width": 0.74,
+        "height": 0.55
+      },
+      "kind": "component",
+      "title": "Tasks: pink-accent time dialog",
+      "summary": "Tasks: pink-accent time dialog with a clock face, numeric display and explicit confirmation.",
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "reference_id": "pilot-ui-v1-music-feature-card",
+      "screen_id": "screen-1d682d23ebc0ab83abb5dcffedf651cc0dad9bd477326673b7c6080c96f76169",
+      "crop": {
+        "x": 0.02,
+        "y": 0.43,
+        "width": 0.37,
+        "height": 0.17
+      },
+      "kind": "component",
+      "title": "Music: large discovery card",
+      "summary": "A prominent rounded recommendation tile with stacked New Music Mix text.",
+      "patterns": ["content-discovery", "recommendations"],
+      "components": [
+        {
+          "type": "card",
+          "description": "Large rounded tile with a multiline text headline."
+        }
+      ],
+      "observations": [
+        "Pale blue rounded surface.",
+        "Large dark teal headline is stacked across three lines."
+      ],
+      "interpretations": [
+        "May provide an entry point into a curated music collection; destination is not proven by the crop."
+      ],
+      "visual_details": [
+        {
+          "attribute": "corner_radius",
+          "value": "Large rounded corners; radius is a visual estimate, not an original token.",
+          "basis": "estimated"
+        }
+      ],
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "reference_id": "pilot-ui-v1-music-shortcut-card",
+      "screen_id": "screen-1d682d23ebc0ab83abb5dcffedf651cc0dad9bd477326673b7c6080c96f76169",
+      "crop": {
+        "x": 0.035,
+        "y": 0.207,
+        "width": 0.45,
+        "height": 0.065
+      },
+      "kind": "component",
+      "title": "Music: compact history shortcut tile",
+      "summary": "Compact horizontal shortcut tile combining a history icon with a short label.",
+      "patterns": ["quick-actions", "content-discovery"],
+      "components": [
+        {
+          "type": "card",
+          "description": "Low-height rounded shortcut tile with an icon and one-line label."
+        },
+        {
+          "type": "icon-label",
+          "description": "History icon aligned to the left of its label."
+        }
+      ],
+      "observations": [
+        "A history icon appears beside the History text.",
+        "Pale blue surface with rounded corners and subtle edge shading."
+      ],
+      "interpretations": ["Could be used as a compact quick-navigation card."],
+      "visual_details": [
+        {
+          "attribute": "elevation",
+          "value": "A subtle shadow or tonal edge is visible; no elevation token can be inferred.",
+          "basis": "estimated"
+        }
+      ],
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "reference_id": "pilot-ui-v1-expense-summary-card",
+      "screen_id": "screen-d68ed8047ac5221fee26d29878fcc9a2c53ea4c90e1bbd1fb5113ce6da05dcb0",
+      "crop": {
+        "x": 0.02,
+        "y": 0.123,
+        "width": 0.96,
+        "height": 0.252
+      },
+      "kind": "component",
+      "title": "Expense: financial totals card",
+      "summary": "A financial summary panel showing a period and separate income/outcome totals.",
+      "patterns": ["financial-summary", "analytics"],
+      "components": [
+        {
+          "type": "card",
+          "description": "Dark financial summary panel with a title, date interval and two totals."
+        },
+        {
+          "type": "statistic",
+          "description": "Uppercase label and larger numeric currency value."
+        }
+      ],
+      "observations": [
+        "Totals title and an October date range appear above Income and Outcome labels.",
+        "Light text is left aligned against a dark gray panel."
+      ],
+      "interpretations": [
+        "Useful as a reference for summarizing financial metrics, rather than as a content-discovery card."
+      ],
+      "visual_details": [
+        {
+          "attribute": "hierarchy",
+          "value": "Panel title, date interval, category labels and larger numeric values.",
+          "basis": "observed"
+        }
+      ],
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "reference_id": "pilot-ui-v1-music-dashboard",
+      "screen_id": "screen-1d682d23ebc0ab83abb5dcffedf651cc0dad9bd477326673b7c6080c96f76169",
+      "kind": "screen",
+      "title": "Music discovery dashboard",
+      "summary": "Music dashboard with greeting, shortcut tiles, recommendation grid, artist section and bottom navigation.",
+      "patterns": ["dashboard", "content-discovery"],
+      "components": [
+        {
+          "type": "card",
+          "description": "Mixed-size music recommendation tiles."
+        },
+        {
+          "type": "bottom-navigation",
+          "description": "Five icon destinations with the For you destination selected."
+        },
+        {
+          "type": "button-group",
+          "description": "History, Last added, Most played and Shuffle shortcuts."
+        }
+      ],
+      "observations": [
+        "A greeting and user avatar appear above a two-column shortcut group.",
+        "Suggestions uses a mixed-size tile grid.",
+        "Recent artists appears above bottom navigation."
+      ],
+      "interpretations": ["Combines quick access to known content with discovery."],
+      "visual_details": [
+        {
+          "attribute": "palette",
+          "value": "Light surfaces with blue/teal accents; see sampled raster palette for approximate values.",
+          "basis": "estimated"
+        }
+      ],
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    },
+    {
+      "reference_id": "pilot-ui-v1-expense-dashboard",
+      "screen_id": "screen-d68ed8047ac5221fee26d29878fcc9a2c53ea4c90e1bbd1fb5113ce6da05dcb0",
+      "kind": "screen",
+      "title": "Expense analytics dashboard",
+      "summary": "Expense dashboard with totals card, weekly chart, recent transaction list and floating add action.",
+      "patterns": ["dashboard", "analytics"],
+      "components": [
+        {
+          "type": "card",
+          "description": "Financial totals and weekly chart panels."
+        },
+        {
+          "type": "chart",
+          "description": "Weekly plot with weekday labels."
+        },
+        {
+          "type": "transaction-list",
+          "description": "Recent expense rows with category icons and amounts."
+        },
+        {
+          "type": "floating-action-button",
+          "description": "Cyan circular plus control at bottom right."
+        }
+      ],
+      "observations": [
+        "Totals, weekly expenses and Recent sections are stacked vertically.",
+        "The recent list uses circular category icons and right-aligned amounts."
+      ],
+      "interpretations": [
+        "May support monitoring finances and starting expense entry from the same dashboard."
+      ],
+      "visual_details": [
+        {
+          "attribute": "palette",
+          "value": "Dark panels with light text and cyan accents; original tokens are unknown.",
+          "basis": "estimated"
+        }
+      ],
+      "annotation": {
+        "author": "Codex native-vision pilot review, 2026-11-20",
+        "basis": "agent_inspected",
+        "image_inspected": true
+      }
+    }
+  ]
+}

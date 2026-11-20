@@ -1,0 +1,553 @@
+import { test } from "node:test";
+import { DatabaseSync } from "node:sqlite";
+import assert from "node:assert/strict";
+import { mkdtemp, writeFile, readFile, rm, symlink, mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import sharp from "sharp";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { LocalLibrary } from "../src/library/store.js";
+import { createLibraryServer } from "../src/library/cli.js";
+import { compareLocalScreens } from "../src/library/comparison.js";
+import { manifestSchema, MODEL, type EmbeddingEngine } from "../src/library/schema.js";
+
+const red = await sharp({ create: { width: 100, height: 200, channels: 3, background: "red" } })
+  .png()
+  .toBuffer();
+const blue = await sharp({ create: { width: 100, height: 200, channels: 3, background: "blue" } })
+  .png()
+  .toBuffer();
+const vector = (index: number) =>
+  Array.from({ length: MODEL.dimensions }, (_, n) => (n === index ? 1 : 0));
+function engine() {
+  let images = 0;
+  const fake: EmbeddingEngine = {
+    setup: async () => MODEL,
+    close: async () => {},
+    text: async (text) => vector(text.includes("blue") ? 1 : 0),
+    image: async (bytes) => {
+      images++;
+      return [
+        {
+          region: "full",
+          vector: vector(
+            createHash("sha256").update(bytes).digest("hex") ===
+              createHash("sha256").update(blue).digest("hex")
+              ? 1
+              : 0,
+          ),
+        },
+      ];
+    },
+  };
+  return { fake, images: () => images };
+}
+const dataset = {
+  id: "owned-test",
+  title: "Owned test UI",
+  source_url: "https://example.org/owned",
+  license: "CC0-1.0",
+  license_url: "https://creativecommons.org/publicdomain/zero/1.0/",
+  attribution: "Test fixtures generated for this repository",
+  rights_basis: "owned" as const,
+};
+const manifest = {
+  schema_version: 1 as const,
+  dataset,
+  screens: [
+    {
+      id: "red",
+      image: "red.png",
+      title: "Red feedback",
+      product: "Example A",
+      platform: "android" as const,
+      tags: ["feedback"],
+      text: "red warning panel",
+    },
+    {
+      id: "blue",
+      image: "blue.png",
+      title: "Blue settings",
+      product: "Example B",
+      platform: "android" as const,
+      tags: ["settings"],
+      text: "blue account settings toggle",
+    },
+    {
+      id: "red-alias",
+      image: "red.png",
+      title: "Red again",
+      product: "Example A",
+      platform: "android" as const,
+      tags: [],
+      text: "red feedback alternate context",
+    },
+  ],
+  flows: [
+    {
+      id: "flow-a",
+      title: "Feedback to settings",
+      goal: "Review warning and open settings",
+      complete: true,
+      steps: [
+        { screen_id: "red", source_step: 0, action: "Open settings" },
+        { screen_id: "blue", source_step: 1, action: "Return" },
+        { screen_id: "red-alias", source_step: 2, action: "Finish" },
+      ],
+    },
+  ],
+};
+async function fixture(t: { after: (fn: () => Promise<void>) => void }) {
+  const root = await mkdtemp(path.join(tmpdir(), "mobbin-library-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(path.join(root, "red.png"), red);
+  await writeFile(path.join(root, "blue.png"), blue);
+  const filename = path.join(root, "manifest.json");
+  await writeFile(filename, JSON.stringify(manifest));
+  const embeddings = engine(),
+    library = new LocalLibrary(path.join(root, "index"), embeddings.fake);
+  t.after(() => library.close());
+  return { root, filename, library, embeddings };
+}
+
+test("library imports immutable local images, deduplicates assets/vectors, preserves ordered flow aliases and reopens", async (t) => {
+  const f = await fixture(t);
+  const status = await f.library.importManifest(f.filename);
+  assert.equal(status.screens, 3);
+  assert.equal(status.distinct_images, 2);
+  assert.equal(status.flows, 1);
+  assert.equal(status.vectors, 2);
+  assert.equal(f.embeddings.images(), 2);
+  const reopened = new LocalLibrary(path.join(f.root, "index"), f.embeddings.fake);
+  assert.equal((await reopened.status()).screens, 3);
+  assert.deepEqual(
+    (await reopened.flow("flow-a")).flow.steps.map((step: { screen_id: string }) => step.screen_id),
+    ["red", "blue", "red-alias"],
+  );
+  await writeFile(path.join(f.root, "red.png"), "changed original");
+  const screen = await reopened.screen("red");
+  assert.equal(screen.width, 100);
+  assert.equal((await sharp(Buffer.from(screen.image.data, "base64")).metadata()).height, 200);
+  assert.deepEqual(screen.flow_ids, ["flow-a"]);
+});
+
+test("local image/text vector search returns expected neighbors with keyword fusion and filters", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const image = await f.library.search({ image: blue });
+  assert.equal(image.results[0].id, "blue");
+  assert.ok(Math.abs(image.results[0].cosine_similarity - 1) < 1e-6);
+  assert.equal((await f.library.search({ query: "blue settings" })).results[0].id, "blue");
+  assert.deepEqual(
+    (await f.library.search({ query: "blue", product: "example a", deduplicate: false })).results
+      .map((row) => row.id)
+      .sort(),
+    ["red", "red-alias"],
+  );
+  assert.equal((await f.library.search({ query: "blue", platform: "ios" })).results.length, 0);
+  assert.ok((await f.library.search({ query: '"; DROP TABLE screens; --' })).results.length > 0);
+  assert.equal((await f.library.status()).screens, 3);
+  await assert.rejects(f.library.search({ query: "blue", image: red }), /exactly one/);
+  await assert.rejects(f.library.search({ image: Buffer.from("not an image") }));
+});
+
+test("failed replacement leaves the installed index intact and cached embeddings support resume", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  assert.equal((await f.library.importManifest(f.filename)).unchanged, true);
+  const next = { ...manifest, dataset: { ...dataset, title: "Replacement" } };
+  await writeFile(f.filename, JSON.stringify(next));
+  await assert.rejects(f.library.importManifest(f.filename), /--replace/);
+  await f.library.importManifest(f.filename, { replace: true });
+  assert.equal(f.embeddings.images(), 2);
+  const before = await f.library.status();
+  await writeFile(
+    f.filename,
+    JSON.stringify({
+      ...next,
+      screens: [...next.screens, { ...next.screens[0], id: "bad", image: "missing.png" }],
+    }),
+  );
+  await assert.rejects(f.library.importManifest(f.filename, { replace: true }));
+  assert.equal((await f.library.status()).manifest_sha256, before.manifest_sha256);
+  assert.equal((await f.library.search({ image: blue })).results[0].id, "blue");
+});
+
+test("imports require rights/provenance, bounded screen counts, valid IDs, and closed flow references", async (t) => {
+  const f = await fixture(t);
+  assert.throws(() =>
+    manifestSchema.parse({ ...manifest, dataset: { ...dataset, rights_basis: undefined } }),
+  );
+  assert.throws(() =>
+    manifestSchema.parse({
+      ...manifest,
+      screens: Array.from({ length: 1001 }, (_, i) => ({
+        ...manifest.screens[0],
+        id: `screen-${i}`,
+      })),
+    }),
+  );
+  await writeFile(
+    f.filename,
+    JSON.stringify({
+      ...manifest,
+      flows: [{ ...manifest.flows[0], steps: [{ screen_id: "missing", source_step: 0 }] }],
+    }),
+  );
+  await assert.rejects(f.library.importManifest(f.filename), /missing screen/);
+  await writeFile(
+    f.filename,
+    JSON.stringify({ ...manifest, screens: [manifest.screens[0], manifest.screens[0]] }),
+  );
+  await assert.rejects(f.library.importManifest(f.filename), /unique/);
+  assert.equal(f.embeddings.images(), 0);
+  assert.equal((await f.library.status()).available, false);
+});
+
+test("imports reject symlink escapes and overlapping imports", async (t) => {
+  const f = await fixture(t);
+  await mkdir(path.join(f.root, "nested"));
+  await symlink(path.join(f.root, "red.png"), path.join(f.root, "nested", "escape.png"));
+  const escaped = {
+    ...manifest,
+    screens: [{ ...manifest.screens[0], image: "escape.png" }],
+    flows: [],
+  };
+  const file = path.join(f.root, "nested", "manifest.json");
+  await writeFile(file, JSON.stringify(escaped));
+  await assert.rejects(f.library.importManifest(file), /outside/);
+  await mkdir(path.join(f.root, "index", ".import.lock"));
+  await assert.rejects(f.library.importManifest(f.filename), /already running/);
+});
+
+test("library-only MCP serves actual screenshots, local search and paginated flows without auth or network", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  t.mock.method(globalThis, "fetch", async () => {
+    throw Error("Unexpected network request");
+  });
+  const server = createLibraryServer(f.library),
+    [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(b);
+  const client = new Client({ name: "local-library-test", version: "1" });
+  await client.connect(a);
+  t.after(async () => {
+    await client.close();
+    await server.close();
+  });
+  const call = async (name: string, args: Record<string, unknown>) => {
+    const result = await client.callTool({ name, arguments: args });
+    assert.ok(!result.isError, JSON.stringify(result));
+    return result;
+  };
+  assert.equal((await client.listTools()).tools.length, 10);
+  assert.equal((await call("mobbin_local_library_status", {})).structuredContent!.screens, 3);
+  const found = await call("mobbin_search_local_library", {
+    image_base64: blue.toString("base64"),
+    image_matching: "layout",
+  });
+  assert.equal(found.structuredContent!.image_matching, "layout");
+  assert.equal((found.structuredContent!.results as Array<{ id: string }>)[0].id, "blue");
+  const compared = await call("mobbin_compare_local_screens", {
+    source_screen_id: "red",
+    candidate_ids: ["blue", "missing"],
+  });
+  assert.equal(compared.structuredContent!.visual_judgment, "pending_agent_inspection");
+  assert.equal(
+    (compared.content as Array<{ type: string }>).filter((block) => block.type === "image").length,
+    2,
+  );
+  const prompt = await client.getPrompt({
+    name: "mobbin_local_reference_comparison",
+    arguments: { request: "Find useful references", source_screen_id: "red" },
+  });
+  assert.match(JSON.stringify(prompt), /Inspect SOURCE/);
+  const image = await call("mobbin_get_local_screen", { screen_id: "blue" });
+  assert.equal(
+    (image.content as Array<{ type: string }>).filter((block) => block.type === "image").length,
+    1,
+  );
+  const flow = await call("mobbin_get_local_flow", {
+    flow_id: "flow-a",
+    offset: 1,
+    limit: 1,
+    include_images: true,
+  });
+  assert.equal(flow.structuredContent!.next_offset, 2);
+  assert.equal(flow.structuredContent!.total_steps, 3);
+  assert.equal(
+    (flow.structuredContent!.flow as { steps: Array<{ screen_id: string }> }).steps[0].screen_id,
+    "blue",
+  );
+  assert.equal(
+    (flow.content as Array<{ type: string }>).filter((block) => block.type === "image").length,
+    1,
+  );
+  const bad = await client.callTool({
+    name: "mobbin_get_local_screen",
+    arguments: { screen_id: "missing" },
+  });
+  assert.equal(bad.isError, true);
+  assert.ok((await readFile(path.join(f.root, "index", "library.sqlite"))).length > 0);
+});
+
+test("deduplicated search preserves aliases, flow references, source exclusion and opt-out", async (t) => {
+  const f = await fixture(t);
+  const withAliasFlow = {
+    ...manifest,
+    flows: [
+      ...manifest.flows,
+      {
+        ...manifest.flows[0],
+        id: "alias-flow",
+        steps: [{ screen_id: "red-alias", source_step: 0, action: "Alias" }],
+      },
+    ],
+  };
+  await writeFile(f.filename, JSON.stringify(withAliasFlow));
+  await f.library.importManifest(f.filename);
+  const result = await f.library.search({ image: red });
+  assert.equal(result.results.length, 2);
+  assert.equal(result.results[0].id, "red");
+  assert.deepEqual(result.results[0].duplicate_screen_ids, ["red-alias"]);
+  assert.deepEqual(result.results[0].flow_ids, ["alias-flow", "flow-a"]);
+  assert.equal(result.deduplication.suppressed_in_window, 1);
+  assert.equal((await f.library.search({ image: red, deduplicate: false })).results.length, 3);
+  const excluded = await f.library.search({ image: red, exclude_screen_id: "red" });
+  assert.deepEqual(
+    excluded.results.map((row) => row.id),
+    ["blue"],
+  );
+  assert.equal((await f.library.status()).screens, 3);
+  assert.equal((await f.library.flow("flow-a")).flow.steps.length, 3);
+});
+
+test("local comparison retrieves alternatives, binds labels to images and includes ordered flow context", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const result = await compareLocalScreens(f.library, { source_screen_id: "red", limit: 4 });
+  const packet = result.structuredContent! as any;
+  assert.equal(packet.candidates.length, 1);
+  assert.equal(packet.candidates[0].screen_id, "blue");
+  assert.equal(packet.candidates[0].flow_contexts[0].matching_position, 1);
+  assert.deepEqual(
+    packet.candidates[0].flow_contexts[0].steps.map((s: any) => s.position),
+    [0, 1, 2],
+  );
+  assert.equal(packet.visual_judgment, "pending_agent_inspection");
+  assert.equal(result.content.filter((block) => block.type === "image").length, 2);
+  const labels = result.content.filter((block) => block.type === "text").map((block) => block.text);
+  assert.ok(labels.includes("SOURCE: red"));
+  assert.ok(labels.includes("CANDIDATE 1: blue"));
+  const provided = await compareLocalScreens(f.library, {
+    image_base64: red.toString("base64"),
+    candidate_ids: ["blue", "missing"],
+  });
+  assert.equal((provided.structuredContent!.candidates as any[])[1].image_status, "unavailable");
+  assert.equal(provided.content.filter((block) => block.type === "image").length, 2);
+  await assert.rejects(
+    compareLocalScreens(f.library, {
+      image_base64: red.toString("base64"),
+      source_screen_id: "red",
+    }),
+    /exactly one/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, { source_screen_id: "red", candidate_ids: ["red"] }),
+    /cannot also/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, { source_screen_id: "red", candidate_ids: ["blue", "blue"] }),
+    /distinct/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, {
+      image_base64: Buffer.from("invalid").toString("base64"),
+      candidate_ids: ["blue"],
+    }),
+  );
+});
+
+test("a failed flow read keeps the comparison image and reports missing context", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  f.library.flow = async () => {
+    throw Error("Flow unavailable for test");
+  };
+  const result = await compareLocalScreens(f.library, {
+    source_screen_id: "red",
+    candidate_ids: ["blue"],
+  });
+  const candidate = (result.structuredContent!.candidates as any[])[0];
+  assert.equal(candidate.image_status, "available");
+  assert.equal(candidate.flow_contexts.length, 0);
+  assert.equal(candidate.flow_errors[0].error, "Flow unavailable for test");
+  assert.equal(result.content.filter((block) => block.type === "image").length, 2);
+  await assert.rejects(
+    compareLocalScreens(f.library, { image_path: "relative.png", candidate_ids: ["blue"] }),
+    /absolute/,
+  );
+  await assert.rejects(
+    compareLocalScreens(f.library, { source_screen_id: "red", limit: 5 }),
+    /limit/,
+  );
+});
+
+test("an unreadable auto-retrieved image is reported without losing the source", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const db = new DatabaseSync(path.join(f.root, "index", "library.sqlite"));
+  try {
+    db.prepare(
+      "UPDATE assets SET bytes=? WHERE hash=(SELECT asset_hash FROM screens WHERE id='blue')",
+    ).run(Buffer.from("damaged image"));
+  } finally {
+    db.close();
+  }
+  const result = await compareLocalScreens(f.library, { source_screen_id: "red" });
+  const packet = result.structuredContent! as any;
+  assert.equal(packet.candidates[0].image_status, "unavailable");
+  assert.equal(packet.retrieval.deduplication.fingerprint_errors.length, 1);
+  assert.equal(result.content.filter((block) => block.type === "image").length, 1);
+  assert.equal(packet.source.screen_id, "red");
+});
+
+test("app diversity preserves closest mode, respects filters and counts pixel aliases only once", async (t) => {
+  const f = await fixture(t);
+  const next = {
+    ...manifest,
+    screens: [
+      ...Array.from({ length: 110 }, (_, i) => ({
+        ...manifest.screens[0],
+        id: `a${String(i).padStart(3, "0")}`,
+        product: i % 2 ? " Example A " : "EXAMPLE A",
+      })),
+      { ...manifest.screens[0], id: "b", product: "Example B" },
+      { ...manifest.screens[1], id: "c", product: "Example C" },
+    ],
+    flows: [],
+  };
+  await writeFile(f.filename, JSON.stringify(next));
+  await f.library.importManifest(f.filename);
+  const request = { query: "warning", deduplicate: false, limit: 4 };
+  const closest = await f.library.search(request);
+  assert.deepEqual(
+    closest.results.map((row) => row.id),
+    ["a000", "a001", "a002", "a003"],
+  );
+  assert.deepEqual(
+    (await f.library.search({ ...request, result_mode: "closest" })).results.map((row) => row.id),
+    closest.results.map((row) => row.id),
+  );
+  const diverse = await f.library.search({ ...request, result_mode: "app_diverse" });
+  assert.deepEqual(
+    diverse.results.map((row) => row.id),
+    ["a000", "b", "c"],
+  );
+  assert.equal(diverse.selection.returned_apps, 3);
+  assert.equal(diverse.results[0].cosine_similarity, closest.results[0].cosine_similarity);
+  const two = await f.library.search({ ...request, result_mode: "app_diverse", max_per_app: 2 });
+  assert.deepEqual(
+    two.results.map((row) => row.id),
+    ["a000", "a001", "b", "c"],
+  );
+  const filtered = await f.library.search({
+    ...request,
+    result_mode: "app_diverse",
+    product: "EXAMPLE A",
+  });
+  assert.equal(filtered.results.length, 1);
+  assert.equal(filtered.selection.available_apps, 1);
+  const grouped = await f.library.search({
+    query: "warning",
+    result_mode: "app_diverse",
+    limit: 4,
+  });
+  assert.deepEqual(
+    grouped.results.map((row) => row.id),
+    ["a000", "c"],
+  );
+  assert.ok(grouped.results[0].duplicate_screen_ids.includes("b"));
+  assert.equal(grouped.selection.returned_apps, 2);
+  await assert.rejects(
+    f.library.search({ query: "warning", max_per_app: 2 }),
+    /only to app_diverse/,
+  );
+  await assert.rejects(
+    f.library.search({ query: "warning", result_mode: "app_diverse", max_per_app: 0 }),
+    /1 or 2/,
+  );
+});
+
+test("comparison exposes app-diverse auto retrieval but preserves explicit shortlists", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const server = createLibraryServer(f.library);
+  const [a, b] = InMemoryTransport.createLinkedPair();
+  await server.connect(b);
+  const client = new Client({ name: "diversity-test", version: "1" });
+  await client.connect(a);
+  t.after(async () => {
+    await client.close();
+    await server.close();
+  });
+  const result = await client.callTool({
+    name: "mobbin_compare_local_screens",
+    arguments: { source_screen_id: "red", result_mode: "app_diverse", max_per_app: 2 },
+  });
+  assert.ok(!result.isError, JSON.stringify(result));
+  const packet = result.structuredContent! as any;
+  assert.equal(packet.retrieval.selection.result_mode, "app_diverse");
+  assert.equal(packet.retrieval.selection.max_per_app, 2);
+  assert.equal(packet.candidates[0].screen_id, "blue");
+  assert.equal(packet.candidates[0].flow_contexts[0].flow_id, "flow-a");
+  const search = await client.callTool({
+    name: "mobbin_search_local_library",
+    arguments: { query: "warning", result_mode: "app_diverse", max_per_app: 1 },
+  });
+  assert.ok(!search.isError, JSON.stringify(search));
+  assert.equal((search.structuredContent!.selection as any).returned_apps, 2);
+  await assert.rejects(
+    compareLocalScreens(f.library, {
+      source_screen_id: "red",
+      candidate_ids: ["blue"],
+      result_mode: "app_diverse",
+    }),
+    /explicit candidate IDs/,
+  );
+  const prompt = await client.getPrompt({
+    name: "mobbin_local_reference_comparison",
+    arguments: {
+      request: "Find cross-app patterns",
+      result_mode: "app_diverse",
+      source_screen_id: "red",
+    },
+  });
+  assert.match(JSON.stringify(prompt), /app_diverse/);
+});
+
+test("app-diverse image retrieval does not fill slots with candidates outside its similarity gap", async (t) => {
+  const f = await fixture(t);
+  await f.library.importManifest(f.filename);
+  const guarded = await f.library.search({ image: red, result_mode: "app_diverse", limit: 4 });
+  assert.equal(guarded.results.length, 1);
+  assert.equal(guarded.selection.max_similarity_drop, 0.1);
+  assert.equal(guarded.selection.excluded_by_similarity, 1);
+  const broad = await f.library.search({
+    image: red,
+    result_mode: "app_diverse",
+    max_similarity_drop: 1,
+    limit: 4,
+  });
+  assert.equal(broad.results.length, 2);
+  await assert.rejects(
+    f.library.search({ image: red, max_similarity_drop: 0.2 }),
+    /only to app_diverse image/,
+  );
+  await assert.rejects(
+    f.library.search({ query: "red", result_mode: "app_diverse", max_similarity_drop: 0.2 }),
+    /only to app_diverse image/,
+  );
+});

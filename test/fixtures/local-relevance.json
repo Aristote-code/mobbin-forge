@@ -1,0 +1,450 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "id": "openmobile-pilot",
+    "title": "Uni-GUI-OpenMobile local pilot",
+    "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile",
+    "license": "Apache-2.0",
+    "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+    "attribution": "UI-MOPD / Uni-GUI-OpenMobile, Niu Lian et al., 2026. Dataset card declares Apache 2.0; original application assets retain their respective rights.",
+    "rights_basis": "licensed",
+    "source_revision": "774eb20f97724bf64faa9e66b1572f05b1688e38"
+  },
+  "index_manifest_sha256": "1216bab5dd4d22c02ac2c0690be1bf83ce0a45ee457584f809dabb206a711ad6",
+  "rubric": {
+    "0": "Irrelevant: shared colors, keyboard, whitespace or app identity alone are insufficient.",
+    "1": "Partial reference: related controls or frame, but prominent state/pattern differs.",
+    "2": "Strong reference: same prominent UI pattern and compatible screen state; app/content may differ."
+  },
+  "judge": "Codex native visual inspection; subjective agent judgments, not independent human ground truth. Candidate pool = union of top 3 from the three frozen scoring variants. No recall or corpus-wide nDCG claims.",
+  "selection": "Deterministic source-directory round robin, first 12 unused episodes with at least two non-indexed images; middle and final eligible steps. Split every third episode into holdout. 24 distinct file hashes, 12 episodes, 11 task app labels. Task app labels can differ from visible app.",
+  "queries": [
+    {
+      "episode": "split1_1004_ExpenseAddMultipleFromGallery",
+      "step": 10,
+      "product": "pro expense",
+      "sha256": "3e85d06efffc1b454b0539a6eeda759a8c46c2b4df61a02f56a5dc808fb1737c",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1004_ExpenseAddMultipleFromGallery/screenshot_step10.png",
+      "id": "q01",
+      "image": "q01.png",
+      "split": "development",
+      "pattern": "Analog time picker modal over a form",
+      "judgments": {
+        "screen-d1db440357b54196c3ecda12bbd23f58c3b45f8d2f7b3828fc84b559e9f2b1df": 2,
+        "screen-e3629647ccddac98c158ccb5def223e0ffbdb91629ca14d68ae5aab16ffa6616": 2,
+        "screen-9f80412085eb3edccf71bdcca4eec87ffa059c47760bff68ed8b57b1217ba7b3": 2
+      }
+    },
+    {
+      "episode": "split1_1004_ExpenseAddMultipleFromGallery",
+      "step": 18,
+      "product": "pro expense",
+      "sha256": "afef68de64bd34653193e87ce81f34e812e03da716b1cdc1c27a3fc6a76e9b16",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1004_ExpenseAddMultipleFromGallery/screenshot_step18.png",
+      "id": "q02",
+      "image": "q02.png",
+      "split": "development",
+      "pattern": "Expense dashboard with totals, chart and recent list",
+      "judgments": {
+        "screen-d68ed8047ac5221fee26d29878fcc9a2c53ea4c90e1bbd1fb5113ce6da05dcb0": 2,
+        "screen-5d41011da57d93cc5349aadc7745d5f8fd9a26affbc9c67daa4269fc6ba019ce": 2,
+        "screen-ff24d1ff7553b93ff6454faa738083258dfeaf701d5a072e9110bd4dfc868447": 2,
+        "screen-ab185c31a800f7a9fdfa63db9dc229d39c5cd4b78977627fc6c97f347c4e3a73": 2,
+        "screen-08c615b179118df264401225450090f3b24357fc75f130c8f479b7b72bae51e7": 2
+      }
+    },
+    {
+      "episode": "split1_100_ClockTimerEntry",
+      "step": 7,
+      "product": "clock",
+      "sha256": "10c803bae732c2ac5e1941a3396683f7c033cc42571f3e99717f0ce01ffde555",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_100_ClockTimerEntry/screenshot_step7.png",
+      "id": "q03",
+      "image": "q03.png",
+      "split": "development",
+      "pattern": "Feedback message form with on-screen keyboard",
+      "judgments": {
+        "screen-b7db933ec3c0d63274539825e32aa5ddb4a2a937f1a22825a019d75695660e46": 2,
+        "screen-2e637b8727d0f7264669169003ac2240a41bc252e6779d4ebd66dbd5eac559b0": 2,
+        "screen-196769935d93d9d71f59dabd8a92ef640a7f7eba3fea2ad8df19014bd487cbd1": 2,
+        "screen-16bda22aea7602e3e0b7dcef4818ace39dd28f3112391645ea069214f4a0d0c3": 1
+      }
+    },
+    {
+      "episode": "split1_100_ClockTimerEntry",
+      "step": 14,
+      "product": "clock",
+      "sha256": "7c5e41146a4ad25cbce1a737fbea83674e0fdad4b416e54bb45d9a341e230296",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_100_ClockTimerEntry/screenshot_step14.png",
+      "id": "q04",
+      "image": "q04.png",
+      "split": "development",
+      "pattern": "World clock overview with large time and bottom tabs",
+      "judgments": {
+        "screen-4eb6190aa3424de3bdedcc2d7f93dc2e5a2f3bd9f584a40b25acb97d3f4169bc": 2,
+        "screen-6ffd675e1cb8c8b7cd73da9e3a8b3c58e5a8cd7db18acdfdac1463f85bc620a2": 2,
+        "screen-df87915cce8db39a2ee0641914a381e18f312af4ce7f905f5e2c4f173f7d2bdd": 2
+      }
+    },
+    {
+      "episode": "split1_1010_SystemBluetoothTurnOnVerify",
+      "step": 5,
+      "product": "settings",
+      "sha256": "9a204a06b2023d8886fdf848c438623d34978f35951417f5531797b8b5126f58",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1010_SystemBluetoothTurnOnVerify/screenshot_step5.png",
+      "id": "q05",
+      "image": "q05.png",
+      "split": "holdout",
+      "pattern": "Battery usage analytics with graph and explanatory labels",
+      "judgments": {
+        "screen-d5cb7786289a5ad203eb7c4d7737a44d1ee3cb501ac3de87dbb6ccbe4981cc5d": 1,
+        "screen-0411882edc43353bb4ccce853f4bb1da0b470df832877e2e04bb63c1316adb11": 2,
+        "screen-c852698231bfa19de539fe9636a1d7ad257d3ceac7bed396e93526fcfd619a53": 0,
+        "screen-ba7843f8929658c99b62d4a4e700ec714a97c57ce08f13d6cabe31492ad1983c": 0,
+        "screen-97670bc7f2a3dbe5e2ef36120dc256606da2346b2511670ba0d2dc45d62e308a": 0,
+        "screen-43acfd75cd0d5626d8dac1a73040c0c7ae78f8080a84d074f11f20daa1c4d912": 0
+      }
+    },
+    {
+      "episode": "split1_1010_SystemBluetoothTurnOnVerify",
+      "step": 9,
+      "product": "settings",
+      "sha256": "e7c5196bf88cfc0efe646155d3bde7538bfe0e11fb2e5397284843a738497e06",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1010_SystemBluetoothTurnOnVerify/screenshot_step9.png",
+      "id": "q06",
+      "image": "q06.png",
+      "split": "holdout",
+      "pattern": "Battery usage analytics with graph and explanatory labels",
+      "judgments": {
+        "screen-d5cb7786289a5ad203eb7c4d7737a44d1ee3cb501ac3de87dbb6ccbe4981cc5d": 1,
+        "screen-43acfd75cd0d5626d8dac1a73040c0c7ae78f8080a84d074f11f20daa1c4d912": 0,
+        "screen-4dc36fcf9581776f998e37f8a349736a79f23d8964a0be3b5432abf357cd12fa": 0,
+        "screen-0411882edc43353bb4ccce853f4bb1da0b470df832877e2e04bb63c1316adb11": 2,
+        "screen-938618d1b7bb1874792ea759e3fc0a69cffbb97fb132346732c134d6dd5e4d72": 0
+      }
+    },
+    {
+      "episode": "split1_1029_SportsTrackerLongestDistanceActivity",
+      "step": 5,
+      "product": "opentracks",
+      "sha256": "47804fb368f557a75f6a59a2a7b060f705d0471573e4e3ecd5074a6ccfefdc8a",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1029_SportsTrackerLongestDistanceActivity/screenshot_step5.png",
+      "id": "q07",
+      "image": "q07.png",
+      "split": "development",
+      "pattern": "Illustrated onboarding page with forward action",
+      "judgments": {
+        "screen-4c154a6a950e15a2514891792d1145566835ed10f90de4a6f0825f7fa974e7e4": 2,
+        "screen-b55e1fa3cc344c9fdc13d1f48e893b218fbb505ce3180b70af70f3e38208691a": 2,
+        "screen-40190047957019579d4502889fc06109b764176fcb841c83ec75f4815b41958e": 0,
+        "screen-aee4a88228e46c4934ae84143bff63face2da0a1e77f547c3445e6889d79c1d8": 0,
+        "screen-285c89c42d50e41544d73ffec54380eb0804d113d2fd55b3d814134827947c2b": 0
+      }
+    },
+    {
+      "episode": "split1_1029_SportsTrackerLongestDistanceActivity",
+      "step": 7,
+      "product": "opentracks",
+      "sha256": "0403821109dc94c07bce97b8558e6fb43695ab087f4eb6e0dd421121afa75a3d",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1029_SportsTrackerLongestDistanceActivity/screenshot_step7.png",
+      "id": "q08",
+      "image": "q08.png",
+      "split": "development",
+      "pattern": "Illustrated onboarding page with forward action",
+      "judgments": {
+        "screen-b55e1fa3cc344c9fdc13d1f48e893b218fbb505ce3180b70af70f3e38208691a": 2,
+        "screen-4c154a6a950e15a2514891792d1145566835ed10f90de4a6f0825f7fa974e7e4": 2,
+        "screen-40190047957019579d4502889fc06109b764176fcb841c83ec75f4815b41958e": 0,
+        "screen-6dfa30b7331965a0d50598efcdd7ecbc4f32f3a558f6de41a92a753f955a640c": 0,
+        "screen-55717a32c68a3355e519cac1da78b51d057e373ee1f2544b6734e09c7599e701": 0
+      }
+    },
+    {
+      "episode": "split1_1040_SimpleCalendarEventsInTimeRange",
+      "step": 7,
+      "product": "simple calendar pro",
+      "sha256": "bf3e4252d98b196736382c3de432d23181bb125dcc5fa05774e51acc27107c0b",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1040_SimpleCalendarEventsInTimeRange/screenshot_step7.png",
+      "id": "q09",
+      "image": "q09.png",
+      "split": "development",
+      "pattern": "Informational modal with two actions over settings",
+      "judgments": {
+        "screen-8de18f6ef7c23339216eaf9c0c38ff6b759a6d42337db733553ae7d8ebb2610f": 2,
+        "screen-f4ffab004e5169dd947de3f5279ed77f84874a5e8857daccb0c0e0d4eb6c2235": 0,
+        "screen-90b0cd8aee284bf57e69b65ee10ee6d422040c500b7e6e71b5fa120706cc5845": 0,
+        "screen-4dbfe40195c8814b1dd4508f81273a74a9aa1b17dd6c4aef7bf6b8b654341850": 1
+      }
+    },
+    {
+      "episode": "split1_1040_SimpleCalendarEventsInTimeRange",
+      "step": 15,
+      "product": "simple calendar pro",
+      "sha256": "09bc871f2989104deace91e11492acace6ad218c3df77ab0244c5f1cb16e2199",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_1040_SimpleCalendarEventsInTimeRange/screenshot_step15.png",
+      "id": "q10",
+      "image": "q10.png",
+      "split": "development",
+      "pattern": "Color selection modal over customization settings",
+      "judgments": {
+        "screen-b7db933ec3c0d63274539825e32aa5ddb4a2a937f1a22825a019d75695660e46": 0,
+        "screen-e81f6ff0f140dab150116403f8863b3006502ac24a4aff4ed3c514967ab5df38": 2,
+        "screen-102138bb42b9edaf6c6938810f879595bc1073671f3fd7f84eca89b0f42df638": 1,
+        "screen-327c91f74adf94edfea35e6d5b2ac3d1f8f94c3de76c56fd3870003abecb8d47": 2,
+        "screen-43b2dca814a878fbd78cb0a8e045aecede25c20f14e18bd3581c981a55c67ac2": 1
+      }
+    },
+    {
+      "episode": "split1_164_VlcCreatePlaylist",
+      "step": 4,
+      "product": "vlc",
+      "sha256": "1c99a11e4cff181177cfa7773e8d9ad1afaf509923b4d2f9d9057ed3ae5107d1",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_164_VlcCreatePlaylist/screenshot_step4.png",
+      "id": "q11",
+      "image": "q11.png",
+      "split": "holdout",
+      "pattern": "Media utility hub with settings, about and add stream cards",
+      "judgments": {
+        "screen-37830332776ae2e805b8707dcabe8d4a3d1ac5414eedfda34abf8a0ed23aecf3": 0,
+        "screen-835ff04dd44f2877ee0beb0e85542b18b11de6769e9d495e72a0ecc9894b0942": 0,
+        "screen-02f63d3c9f5a8b9967675657ed5dcad432417bac582c9dc116f2969eb2614cf9": 0,
+        "screen-748d23f08205fda173926f2d20141677ecbdbfde29e64391992c1f0898a0ffb5": 0,
+        "screen-5575d5f622abe5b7a14c0590b61b3e44ce953f7f5ae94a6786a39ac234ec94b2": 0,
+        "screen-8b4b34ad926f745c268cbdeb43d8afc4c3f3b3f47068d67828a6780dfa9907ed": 0,
+        "screen-0cdda3e8c7ee17cb904c3a4f7b986cfd4a05f0c55c53ca7084b266c3d31bf36a": 0,
+        "screen-4e9b508057cd9673619a7badfa4ada19b3f383a5467e9fbfb18216ef4bba85b3": 0
+      }
+    },
+    {
+      "episode": "split1_164_VlcCreatePlaylist",
+      "step": 8,
+      "product": "vlc",
+      "sha256": "8cc80fb7e25812080b55ffa3a30c75fcfc916115f63c584ee788154da1537292",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_164_VlcCreatePlaylist/screenshot_step8.png",
+      "id": "q12",
+      "image": "q12.png",
+      "split": "holdout",
+      "pattern": "About page with app identity, version and resource links",
+      "judgments": {
+        "screen-b1cc801a96c0c123b9364766ce487a2925d77fb6b88c36c1351197c9a6a8b50d": 0,
+        "screen-3450aa713099a4d3b827be445f3fed96010d812258793101754ea14b67c37444": 0,
+        "screen-d5f5eb4debe87e41eba46bb8d0257e76bde90d9a0df4e979c4a8605ef80764cd": 0,
+        "screen-e3bea0232382f413d4ca81f797be4672e82c6c20658d88ae133e23a566e48b4f": 0
+      }
+    },
+    {
+      "episode": "split1_172_RecipeAddSingleRecipe",
+      "step": 7,
+      "product": "broccoli-recipe app",
+      "sha256": "cd77f59874d6fce6fd238f353087dfb5474d25ac0ea9691bab3e8a7aec6cfcbb",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_172_RecipeAddSingleRecipe/screenshot_step7.png",
+      "id": "q13",
+      "image": "q13.png",
+      "split": "development",
+      "pattern": "Numeric adjustment dialog and numeric keyboard",
+      "judgments": {
+        "screen-487cbec75cdfb80329c3583827deb1c2ca6cc9eeb26e4cc2d8a4b2086d7f8e63": 1,
+        "screen-2f467f83cd2b1aacb4e9b3d9b9a3352eed304edc9a5ef94dfcef4d09df29b545": 1,
+        "screen-6ffc0c3c668f5abdbc773a76c739d8297c081a868f7864da1e1826f60745f52e": 1,
+        "screen-598a656a34062a1155364db7170382d7b94926f4f4c65e9e4846037dde13c34e": 1,
+        "screen-55c9fcdec99c4156aef20a6e34bcb23131021af8a4c0995d9bedb41361996e7c": 1,
+        "screen-3332ab690a081c20cacbdaf2e9a0586211af178588c45cf4d14069b1b2879b12": 1,
+        "screen-09fce07fc4d7b1c2c855ac81119f22f19849311ab0af9aa515e67c4758e34358": 1,
+        "screen-74821873137df15085a12ff18e8e7e64246e103ba1c8d6b0ae9e10e1adf9b03e": 1
+      }
+    },
+    {
+      "episode": "split1_172_RecipeAddSingleRecipe",
+      "step": 16,
+      "product": "broccoli-recipe app",
+      "sha256": "6fac8a54b19c8a0e74715d4ef455a6d222690df3ada879c4311bd19fc0a3dc3e",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_172_RecipeAddSingleRecipe/screenshot_step16.png",
+      "id": "q14",
+      "image": "q14.png",
+      "split": "development",
+      "pattern": "Minimal recipe reading pager with page indicators",
+      "judgments": {
+        "screen-40a5bc79e89dd7c8061b0154f8e828ff3c119a2839aaa094b14c5329a43be1d7": 2,
+        "screen-82533fa5fb40b807e82984e1bedce5b95a2e5154e488f12b09e7d89631bc0197": 2,
+        "screen-24faf257af417ac9c9b1c0fbf4d7742d0a2106b54ca8d6b03cb2a1fe3fc4b299": 0
+      }
+    },
+    {
+      "episode": "split1_173_SimpleSmsReplyMostRecent",
+      "step": 16,
+      "product": "simple sms messenger",
+      "sha256": "9af3594d49a2c2a32ecd3f0c718e5a14d7fe50d3ccedb1444bedcb505996dc0f",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_173_SimpleSmsReplyMostRecent/screenshot_step16.png",
+      "id": "q15",
+      "image": "q15.png",
+      "split": "development",
+      "pattern": "SMS conversation with message bubble and composer",
+      "judgments": {
+        "screen-81480b7c403c34df963f865f54f9cbdd24fd3538e99d772a143793df349b9596": 2,
+        "screen-ae3491d509caf9fb97a2e17522f691220ffbd9689a46f2a0c3e5b2d75fe08375": 2,
+        "screen-5c028c4a81e8265d5af3019c7d480524cddaf05e3f6cfad443fdb450d04552fd": 0,
+        "screen-e95ed3c79a429feba525108e0612e0fdc0cac33503e7b809557f375475173af5": 0,
+        "screen-31a852127b65680dbdbce10f8048810bbf48cfb5a80d0ee4a81d46b7a51a57a9": 1,
+        "screen-b09494fe964e7220fa9882a1b27ddeeb602d2318f2e8389c5cadedb9ee169f41": 0
+      }
+    },
+    {
+      "episode": "split1_173_SimpleSmsReplyMostRecent",
+      "step": 29,
+      "product": "simple sms messenger",
+      "sha256": "7584b19553a4db169e3be6952a818ebb5cfbd20f91a35898cd0b576c0e145db1",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_173_SimpleSmsReplyMostRecent/screenshot_step29.png",
+      "id": "q16",
+      "image": "q16.png",
+      "split": "development",
+      "pattern": "SMS conversation with sent and received bubbles",
+      "judgments": {
+        "screen-81480b7c403c34df963f865f54f9cbdd24fd3538e99d772a143793df349b9596": 2,
+        "screen-ae3491d509caf9fb97a2e17522f691220ffbd9689a46f2a0c3e5b2d75fe08375": 2,
+        "screen-31a852127b65680dbdbce10f8048810bbf48cfb5a80d0ee4a81d46b7a51a57a9": 1,
+        "screen-e95ed3c79a429feba525108e0612e0fdc0cac33503e7b809557f375475173af5": 0,
+        "screen-ee3885dd5e07c5f40a64adb6dedc8794a1b57081877741490164f69705d842ac": 0
+      }
+    },
+    {
+      "episode": "split1_217_NotesRecipeIngredientCount",
+      "step": 7,
+      "product": "joplin",
+      "sha256": "96471e360dae925ef96c47aaef38283daa8d3db80b64fed1c1b0695ee0e47262",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_217_NotesRecipeIngredientCount/screenshot_step7.png",
+      "id": "q17",
+      "image": "q17.png",
+      "split": "holdout",
+      "pattern": "Recipe editor with image, fields and keyboard",
+      "judgments": {
+        "screen-0cb6d168fa578d35c237db97bf76f71da1bc3ce76cc9a099e6e972d69ca16da4": 2,
+        "screen-442698abec48833f77d40841c3735222abf9ab24f9f216d66627e99a2f78129f": 2,
+        "screen-08040ca8a4baf67b4bbd8d7485ccb3881f9cff0e5b10b5c546f32b91e4d1d6b4": 2
+      }
+    },
+    {
+      "episode": "split1_217_NotesRecipeIngredientCount",
+      "step": 12,
+      "product": "joplin",
+      "sha256": "d801beaff205a33609a86b85302080efc165549c12ed67bc601b525adb2bda66",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_217_NotesRecipeIngredientCount/screenshot_step12.png",
+      "id": "q18",
+      "image": "q18.png",
+      "split": "holdout",
+      "pattern": "Recipe detail page with title, ingredients and directions",
+      "judgments": {
+        "screen-d8a2b665788a1c0491249bbfd0a9b1aabaad63af58451112c9488acbf081493e": 2,
+        "screen-9e22574d85c3902a0445928cb3e13d1a810a8829f52f2a6d3ea2e1d39efc26c0": 2,
+        "screen-33ac52a3fb074a62706b90cf011f637db0aae711df3991b3b0f8b614fdfc06cb": 2,
+        "screen-04a92cb656ad4cd987975ae1b2005e509bdc8d46e99fe3321c7ddbaec0ca97db": 0,
+        "screen-88a9f67fb4173a021b502280e94396599334aaa04bc74ace8bcc189849954370": 0,
+        "screen-df9580db81ca840488a52f962590b4eb66f1f98498a97c3329ad981eb32bd683": 2,
+        "screen-0c3694d705b024a29feb845c2da748716878550570bf6d61626ff84fb5dc5467": 2
+      }
+    },
+    {
+      "episode": "split1_237_RetroPlayingQueue",
+      "step": 2,
+      "product": "retro music",
+      "sha256": "6eb754a893d3bca192c6fd5d4876ab2a37a1ece2aba7b811c999212a397a2132",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_237_RetroPlayingQueue/screenshot_step2.png",
+      "id": "q19",
+      "image": "q19.png",
+      "split": "development",
+      "pattern": "Music discovery dashboard with recommendation tiles",
+      "judgments": {
+        "screen-1d682d23ebc0ab83abb5dcffedf651cc0dad9bd477326673b7c6080c96f76169": 2,
+        "screen-855961c38ca66db80b9bf7cb89ff70512942f24c550c1e27d7654687abcddb0e": 2,
+        "screen-3cc7ff2df16887db2def4dbb812c5ac091efa33282778d8f94eafc10e1757f3c": 2,
+        "screen-b7f43a31c38f03ba108520299d89a658c29e96a5be4210941fcd0b831b3a5be6": 2
+      }
+    },
+    {
+      "episode": "split1_237_RetroPlayingQueue",
+      "step": 5,
+      "product": "retro music",
+      "sha256": "a187df3bf835b8c603595e03b26e590797b5671f6842c8955f41b37ce024dc75",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_237_RetroPlayingQueue/screenshot_step5.png",
+      "id": "q20",
+      "image": "q20.png",
+      "split": "development",
+      "pattern": "Empty collection with centered illustration and explanatory text",
+      "judgments": {
+        "screen-ec59f85ce7a24cd599414567babe68999738e5f2be372b7b191ea04be3ac775b": 0,
+        "screen-bd9e4f159c681e3bf2880cfe19b7816c51ea5543ea901cb762d43396a7498298": 0,
+        "screen-e9e36115dfb110fb6288edd76fe4f83e42399bcb2db658b923d106502eb1ed0a": 2,
+        "screen-70300c7d6d3afe9c0c7fc769f4b0058f7c2ed93fcceea599b1e12d92208c5e19": 2,
+        "screen-0d0b7bd8aad259b137f3877bfc3111a9e13a2630072c10dd2782da1f6014107a": 0
+      }
+    },
+    {
+      "episode": "split1_248_MarkorDeleteAllNotes",
+      "step": 4,
+      "product": "joplin",
+      "sha256": "e6d3e4142625dbdaec121665e1bd473a4e39415bd2b4ca3dbfc946545d80e99d",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_248_MarkorDeleteAllNotes/screenshot_step4.png",
+      "id": "q21",
+      "image": "q21.png",
+      "split": "development",
+      "pattern": "Note editor with cursor and on-screen keyboard",
+      "judgments": {
+        "screen-207d6539ea5b41b032254c0173a898c87f65ec24acb13ab5dee25107692831d7": 2,
+        "screen-16bda22aea7602e3e0b7dcef4818ace39dd28f3112391645ea069214f4a0d0c3": 2,
+        "screen-7388ef0f3db01564b82d5c43e5903e2c476c0338cda8a91096d43e2e2b6663c0": 1,
+        "screen-2075e8214a3a328184175060aca78e1043f716831a098896686737f15b759249": 1,
+        "screen-ba4eb369ad4eefe5b4d107df1ebe5c13a7f5b7d8eded7b0c3f3cc3948c2e0722": 1
+      }
+    },
+    {
+      "episode": "split1_248_MarkorDeleteAllNotes",
+      "step": 6,
+      "product": "joplin",
+      "sha256": "f78f1d766d27da2463cccefa54ea181385cbfaaeb264e6015ddc7fee7bc12767",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_248_MarkorDeleteAllNotes/screenshot_step6.png",
+      "id": "q22",
+      "image": "q22.png",
+      "split": "development",
+      "pattern": "Note editor with cursor and on-screen keyboard",
+      "judgments": {
+        "screen-16bda22aea7602e3e0b7dcef4818ace39dd28f3112391645ea069214f4a0d0c3": 2,
+        "screen-e338e997628003b7a65c749113ad1e98fb9e9bc324ce71aba6ea751c0ee94b02": 2,
+        "screen-acc315a3297ef30a518b6b8905012f3517a063029ec1d596af960ab7d3d2b7ba": 2
+      }
+    },
+    {
+      "episode": "split1_281_TasksHighPriorityTasks",
+      "step": 3,
+      "product": "tasks",
+      "sha256": "bc9edd2fd2f986049a1d884522d1ed1743f2e8f2b62fbc7f0bdba8294439e2c1",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_281_TasksHighPriorityTasks/screenshot_step3.png",
+      "id": "q23",
+      "image": "q23.png",
+      "split": "holdout",
+      "pattern": "Task list with checkboxes, due labels and bottom action bar",
+      "judgments": {
+        "screen-4a6608ba388eb2c1d2b725f36e15aff398b902939921968689137d9022ec906f": 2,
+        "screen-64a0f15608ff46de25dd4a4c75c0c907fb08261fe2eacc18477072d675dc580e": 2,
+        "screen-83ba64176bb941e7efa2d6adaa771445f0686b09f127766bb4b237180d4e0f78": 2,
+        "screen-1bd54068a65fc70300fe15ad2acec9f44cbbe94632c2c4a2a9635965120e8f9b": 2,
+        "screen-0a7b7616bdb7f75614155703cb55fec3260088fac34304b1a0ca82ca5ce825fa": 2
+      }
+    },
+    {
+      "episode": "split1_281_TasksHighPriorityTasks",
+      "step": 5,
+      "product": "tasks",
+      "sha256": "993c36d0efe17902f695520530bf395e69ef476d41f0af060a66384061177a72",
+      "source_url": "https://huggingface.co/datasets/UI-MOPD/Uni-GUI-OpenMobile/resolve/774eb20f97724bf64faa9e66b1572f05b1688e38/split1_281_TasksHighPriorityTasks/screenshot_step5.png",
+      "id": "q24",
+      "image": "q24.png",
+      "split": "holdout",
+      "pattern": "Date and time selection sheet over task editor",
+      "judgments": {
+        "screen-cad53f497fecd33225d65951f537ca1eae9407afeae6ff093a1eb44f76f5854d": 2,
+        "screen-3721e12d1c3bfce66694cd611bb955e8f844faa43b27665b0b8a528f44e83a6f": 2,
+        "screen-89500788c191d98c4a9da852ab6b81a5c45e0df126da3df1328e44d1a60ad1ba": 2,
+        "screen-538300609f9d65e6d57c1d61a6456434973cb5d393de5aa00b5eed016b11060a": 2
+      }
+    }
+  ]
+}

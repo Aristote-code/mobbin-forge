@@ -6,9 +6,60 @@
 
 > The original mobbin-mcp is **archived and broken**. This fork fixes it.
 
-An MCP server that works with [Mobbin](https://mobbin.com) — 600k+ real app screens and flows from 1,100+ apps. Search screens, browse flows, grab palettes, build better UI without leaving Claude. Mobbin now offers an [official API and MCP](https://docs.mobbin.com/mcp/introduction). This independent server uses authenticated website routes instead.
+An MCP server that works with [Mobbin](https://mobbin.com) — search screens, browse flows, inspect images, and retain benchmarking research without leaving Codex or another MCP client. Mobbin also offers an [official API and MCP](https://docs.mobbin.com/mcp/introduction). This independent server uses authenticated website routes instead.
 
 The local build includes the image-resolution fix from `ScreenClear-for-Mobbin-1.1.1`. Encrypted CDN previews are resolved to their original screenshot paths before download. Discovery preserves the opaque `enc` parameter, validates the returned screenshot path, and falls back to the supplied URL if lookup or download fails. Tiny placeholders are reported as errors rather than returned as screenshots.
+
+## Local vector search in 1.7
+
+Build an authorized 1,000-screen pilot with real local image/text embeddings and preserved flow records. A pinned CLIP model runs on your CPU; SQLite stores images, region vectors, keyword text, and flow links. No paid AI API or database service is needed.
+
+The bundled downloader samples the publisher-licensed **Uni-GUI-OpenMobile** dataset, preserves complete provided trajectories and attribution, and deduplicates repeated screenshot files. It does not crawl Mobbin. Model setup and dataset downloads need internet; normal local inference uses cached files with network fetches disabled in the worker.
+
+```bash
+npm install --include=optional
+npm run build
+node dist/index.js library setup
+npm run pilot:download
+node dist/index.js library import "$HOME/.mobbin-mcp/pilot/openmobile/manifest.json"
+node dist/index.js library search calendar create event
+```
+
+Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the ten local-library tools alongside the existing Mobbin tools. Search groups repeated frames while retaining their IDs and flow links. `mobbin_compare_local_screens` returns a source, up to four labeled candidates, and adjacent flow steps for your agent to inspect locally. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
+
+For cross-app inspiration, set `result_mode: "app_diverse"` on local search or auto comparison. It prefers one reference per imported app label and uses a conservative similarity-gap guard for image queries. `closest` remains the default. A native agent can also describe the source's visible UI pattern, run a diverse text search, and compare that shortlist locally.
+
+## Local UI knowledge and component references
+
+Add an inspected screen or cropped card/dialog with pattern labels, component descriptions, visual observations, estimates and source attribution. Search those references by text or component image, then compare actual alternatives with their saved flow context. Your coding agent supplies semantic annotations using its existing vision; local CLIP supplies embeddings. No additional AI API is called.
+
+Five knowledge tools are available alongside the existing local screenshot tools: status, save, search, get, and compare. `npm run knowledge:pilot` installs nine reviewed references from the existing licensed pilot without changing its screenshots or flows. The full local catalog also provides 1,000 machine-generated screen descriptions, clearly separated from reviewed entries. OCR text and geometry, inferred UI candidates, measured raster details and complete provided flow memberships are available as local JSON and through the MCP. [Full catalog, confidence and usage](docs/ui-catalog.md). [Workflow, tool arguments, coverage and limitations](docs/ui-knowledge.md).
+
+## Screenshot references in 1.6
+
+Give your coding agent a screenshot and ask: **“Find real screens like this. Prioritize the layout and components, inspect the candidate images, and explain the closest references.”**
+
+Three new MCP tools organize a native-vision workflow: prepare the screenshot, retrieve candidates from a visual brief, and return labeled comparison images. Claude, Codex, or another image-capable agent performs the visual analysis; this MCP does not call another AI provider. No additional AI API key is required, although normal agent usage and Mobbin account limits still apply.
+
+Screenshots already attached to a conversation can stay there. Local-file and inline-image inputs are also supported. The `mobbin_visual_reference_search` MCP prompt describes the workflow for clients that expose prompts.
+
+This retrieves candidates with standard text search and then lets the agent compare their images. It is not an independent visual index of the entire Mobbin catalog. Retrieval order is not a similarity score, and image failures remain explicit. See [native visual search](docs/visual-search.md) for inputs, limits, and verification.
+
+## Research workflows in 1.5
+
+Benchmark any product or a general design question directly from your MCP client. No separate website, browser package, or additional AI API key is required. The MCP stores evidence and builds comparison packets; your existing coding agent inspects references and writes the analysis.
+
+- Save optional project profiles with an audience, goals, constraints, principles, and existing component names.
+- Retain ordered flows and source/image links from Mobbin, Playwright, Agent Browser, or manual research.
+- Align steps by explicit stage labels and compare findings against user-defined criteria.
+- Preserve cited observations, interpretations, hypotheses, preferences, adoption/rejection decisions, and proposed experiments.
+- Find prior research with keyword search and return a structured packet or an exportable Markdown brief.
+
+Example: “Compare three onboarding flows against clarity and required effort. Save the source references, record what you actually inspected, and prepare a brief with a proposed change and a hypothesis to test.”
+
+References and capture metadata are supplied by the calling agent. Inspection is an agent attestation, not independent server verification. The server does not infer absent screens, calculate UX quality scores, prove conversion improvements, run experiments, or autonomously conduct research. Missing stages mean **not provided**. A catalog-wide visual index and competitor change monitoring remain future work.
+
+See [research tool inputs and workflow](docs/research-workflows.md) and [Agent Browser versus Playwright](docs/browser-tooling.md).
 
 ## Independent 1.4 upgrade
 
@@ -48,7 +99,7 @@ The `restricted` flag describes Mobbin's preview; it does not establish whether 
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 22.13+
 - A [Mobbin](https://mobbin.com) account (free works)
 
 ### 1. Install & build
@@ -117,7 +168,7 @@ npm run format:check
 npm run test:live
 ```
 
-`test:live` is an opt-in network check using your stored Mobbin session. A fresh cookie is required; authentication validates the session before saving it. It exercises the stdio MCP connection, app lookup, first and last screen pages, full-size image responses, colors, flows, search, popular apps, collections listing, filters, website sections, saved items, comment reads, and account-capability reporting. If Deep Search is unavailable, it verifies the denial without running a paid/credit-consuming search. It does not post comments, create collections, or download every screenshot in the catalog.
+`test:live` is an opt-in network check using your stored Mobbin session. A fresh cookie is required; authentication validates the session before saving it. It exercises the stdio MCP connection, app lookup, first and last screen pages, full-size image responses, colors, flows, search, popular apps, collections listing, filters, website sections, saved items, comment reads, and account-capability reporting. If Deep Search is unavailable, it verifies the denial without running a paid/credit-consuming search. It also creates and removes isolated temporary local research records using a live image reference. It does not post comments, create Mobbin collections, or download every screenshot in the catalog.
 
 ## Gallery preview
 
