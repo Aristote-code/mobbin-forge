@@ -102,6 +102,7 @@ try {
     await call("mobbin_search_ui_knowledge", {
       query: "analog time picker confirmation dialog",
       component: "time-picker",
+      annotation_scope: "reviewed",
       kind: "component",
       result_mode: "app_diverse",
       limit: 4,
@@ -112,6 +113,7 @@ try {
   const comparison = await call("mobbin_compare_ui_references", {
     source_reference_id: "pilot-ui-v1-time-tasks",
     component: "time-picker",
+    annotation_scope: "reviewed",
     result_mode: "app_diverse",
     limit: 3,
   });

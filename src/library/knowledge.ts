@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { knowledgeInput, cropSchema, type Crop, type KnowledgeInput } from "./knowledge-schema.js";
+import { MAX_KNOWLEDGE_REFERENCES, type AutomaticEvidence } from "./knowledge-schema.js";
 import { MODEL_KEY, normalize, type ChunkVector } from "./schema.js";
 import type { LocalLibrary } from "./store.js";
 import { loadLocalImage, localPreview } from "./images.js";
@@ -35,6 +36,7 @@ export type KnowledgeRecord = {
   interpretations: string[];
   visual_details: KnowledgeInput["visual_details"];
   annotation: KnowledgeInput["annotation"];
+  automation_evidence?: AutomaticEvidence;
   source: {
     screen_id?: string;
     manifest_sha256?: string;
@@ -141,7 +143,8 @@ export class UIKnowledge {
       if (write) {
         await chmod(this.filename(), 0o600);
         db.exec(`CREATE TABLE IF NOT EXISTS references_ui(id TEXT PRIMARY KEY,revision INTEGER NOT NULL,record TEXT NOT NULL,image BLOB NOT NULL,hash TEXT NOT NULL,model TEXT NOT NULL,vectors TEXT NOT NULL);
-          CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_text USING fts5(reference_id UNINDEXED,content);`);
+          CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_text USING fts5(reference_id UNINDEXED,content);
+          CREATE INDEX IF NOT EXISTS reference_image_model ON references_ui(hash,model);`);
       }
       return db;
     } catch (error) {
@@ -168,8 +171,13 @@ export class UIKnowledge {
         annotated_screens: new Set(records.map((r) => r.source.screen_id).filter(Boolean)).size,
         patterns: [...new Set(records.flatMap((r) => r.patterns))].sort(),
         components: [...new Set(records.flatMap((r) => r.components.map((c) => c.type)))].sort(),
+        automatic_references: records.filter((r) => r.annotation.basis === "local_automated")
+          .length,
+        agent_reviewed_references: records.filter(
+          (r) => r.annotation.basis === "agent_inspected" && r.annotation.image_inspected,
+        ).length,
         component_references: records.filter((r) => r.kind === "component").length,
-        note: "Coverage is explicitly annotated references, not automatic understanding of every imported screen. Flow contexts are saved excerpts; annotations are user/agent authored.",
+        note: "Coverage includes explicit references and clearly labeled unreviewed local-automated records. Inferred patterns/roles are candidates, not verified UI trees. Flow snapshots are excerpts; automation evidence retains all provided flow memberships.",
       };
     } finally {
       db.close();
@@ -177,6 +185,13 @@ export class UIKnowledge {
   }
   async save(raw: KnowledgeInput) {
     const input = knowledgeInput.parse(raw);
+    if (
+      input.annotation.basis === "local_automated" &&
+      (!input.automation_evidence || input.annotation.image_inspected)
+    )
+      throw Error(
+        "Automatic annotations require machine evidence and cannot claim agent image inspection.",
+      );
     if (
       [input.screen_id, input.image_path, input.image_base64].filter((v) => v !== undefined)
         .length !== 1
@@ -188,6 +203,15 @@ export class UIKnowledge {
     const sourceScreen = input.screen_id ? await this.library.screen(input.screen_id) : undefined;
     if (!sourceScreen && (!input.rights || !input.product))
       throw Error("Custom image references require product and rights/provenance.");
+    if (input.annotation.basis === "local_automated") {
+      if (!sourceScreen || !sourceStatus || !("manifest_sha256" in sourceStatus))
+        throw Error("Automatic batch annotations require an indexed source.");
+      if (
+        input.automation_evidence!.source_manifest_sha256 !== sourceStatus.manifest_sha256 ||
+        input.automation_evidence!.source_asset_sha256 !== sourceScreen.asset_sha256
+      )
+        throw Error("Automatic evidence does not match the source image and manifest.");
+    }
     const bytes = sourceScreen
       ? Buffer.from(sourceScreen.image.data, "base64")
       : (await loadLocalImage(input))!;
@@ -244,7 +268,20 @@ export class UIKnowledge {
           "Source library changed during annotation; inspect the source again and retry.",
         );
     }
-    const vectors = (await this.library.imageVectors(raster.data)).map((v) => ({
+    const rasterHash = hash(raster.data);
+    const cacheDb = await this.database();
+    let cachedVectors: ChunkVector[] | undefined;
+    if (cacheDb) {
+      try {
+        const cached = cacheDb
+          .prepare("SELECT vectors FROM references_ui WHERE hash=? AND model=? LIMIT 1")
+          .get(rasterHash, MODEL_KEY) as { vectors: string } | undefined;
+        if (cached) cachedVectors = JSON.parse(cached.vectors) as ChunkVector[];
+      } finally {
+        cacheDb.close();
+      }
+    }
+    const vectors = (cachedVectors ?? (await this.library.imageVectors(raster.data))).map((v) => ({
       ...v,
       vector: normalize(v.vector),
     }));
@@ -263,6 +300,7 @@ export class UIKnowledge {
       interpretations: input.interpretations,
       visual_details: input.visual_details,
       annotation: input.annotation,
+      automation_evidence: input.automation_evidence,
       source: {
         screen_id: input.screen_id,
         manifest_sha256:
@@ -290,15 +328,7 @@ export class UIKnowledge {
           "Approximate palette sampled from a 64px raster and quantized RGB bins; not original design tokens.",
       },
     };
-    const content = [
-      record.title,
-      record.summary,
-      ...record.patterns,
-      ...record.components.flatMap((c) => [c.type, c.description]),
-      ...record.observations,
-      ...record.interpretations,
-      ...record.visual_details.flatMap((v) => [v.attribute, v.value]),
-    ].join("\n");
+    const content = knowledgeSearchContent(record);
     const db = (await this.database(true))!;
     try {
       db.exec("BEGIN IMMEDIATE");
@@ -309,9 +339,12 @@ export class UIKnowledge {
         throw Error("Knowledge revision conflict: read the current reference before updating it.");
       if (
         !current &&
-        (db.prepare("SELECT count(*) AS n FROM references_ui").get() as { n: number }).n >= 1000
+        (db.prepare("SELECT count(*) AS n FROM references_ui").get() as { n: number }).n >=
+          MAX_KNOWLEDGE_REFERENCES
       )
-        throw Error("Knowledge pilot limit is 1,000 references.");
+        throw Error(
+          "Knowledge capacity is 10,000 references, including curated components and automatic screen records.",
+        );
       if (current) {
         record.revision = current.revision + 1;
         record.created_at = (JSON.parse(current.record) as KnowledgeRecord).created_at;
@@ -322,7 +355,7 @@ export class UIKnowledge {
         record.revision,
         serialized,
         raster.data,
-        hash(raster.data),
+        rasterHash,
         MODEL_KEY,
         JSON.stringify(vectors),
       );
@@ -335,6 +368,32 @@ export class UIKnowledge {
         db.exec("ROLLBACK");
       } catch {
         /* no active transaction */
+      }
+      throw error;
+    } finally {
+      db.close();
+    }
+  }
+  /** Explicit maintenance step used after a bulk generation; preserves all records/images. */
+  async rebuildKeywords() {
+    const db = (await this.database(true))!;
+    try {
+      db.exec("BEGIN IMMEDIATE");
+      const records = db.prepare("SELECT id,record FROM references_ui").all() as Array<{
+        id: string;
+        record: string;
+      }>;
+      db.exec("DELETE FROM knowledge_text");
+      const insert = db.prepare("INSERT INTO knowledge_text VALUES(?,?)");
+      for (const item of records)
+        insert.run(item.id, knowledgeSearchContent(JSON.parse(item.record) as KnowledgeRecord));
+      db.exec("COMMIT");
+      return { indexed_references: records.length };
+    } catch (error) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {
+        /* no transaction */
       }
       throw error;
     } finally {
@@ -369,6 +428,7 @@ export class UIKnowledge {
     result_mode?: "closest" | "app_diverse";
     limit?: number;
     exclude_reference_id?: string;
+    annotation_scope?: "all" | "reviewed" | "automated";
   }) {
     if (input.query !== undefined && input.image)
       throw Error("Use a text query or image, not both.");
@@ -379,6 +439,11 @@ export class UIKnowledge {
     if (!Number.isInteger(limit) || limit < 1 || limit > 20) throw Error("Limit must be 1–20.");
     if (input.result_mode && !["closest", "app_diverse"].includes(input.result_mode))
       throw Error("Unknown result mode.");
+    if (
+      input.annotation_scope &&
+      !["all", "reviewed", "automated"].includes(input.annotation_scope)
+    )
+      throw Error("Unknown annotation scope.");
     const db = await this.database();
     if (!db)
       return {
@@ -406,6 +471,12 @@ export class UIKnowledge {
         .filter(
           (r) =>
             (!excluded || r.hash !== excluded.hash) &&
+            (!input.annotation_scope ||
+              input.annotation_scope === "all" ||
+              (input.annotation_scope === "automated"
+                ? r.reference.annotation.basis === "local_automated"
+                : r.reference.annotation.basis !== "local_automated" &&
+                  r.reference.annotation.image_inspected)) &&
             (!input.pattern || r.reference.patterns.some((p) => key(p) === key(input.pattern!))) &&
             (!input.component ||
               r.reference.components.some((c) => key(c.type) === key(input.component!))) &&
@@ -492,17 +563,53 @@ export class UIKnowledge {
                 .flatMap((other) => other.reference.source.flow_ids),
             ),
           ],
-          reference: r.reference,
+          reference: compactKnowledge(r.reference),
           cosine_similarity: r.cosine,
           rank_score: r.score,
           exact_image_match: r.exact,
         })),
         searched_references: rows.length,
         result_mode: input.result_mode ?? "closest",
-        note: "Annotation-assisted local retrieval; tags and observations are user/agent authored. Scores are not match percentages. Exact stored-image duplicates are grouped. Flow context is a saved excerpt, not verified navigation. Inspect returned images before recommending a reference.",
+        annotation_scope: input.annotation_scope ?? "all",
+        note: "Annotation-assisted local retrieval; curated entries are user/agent authored; automated entries are unreviewed OCR/CLIP/rule candidates. Scores are not match percentages. Exact stored-image duplicates are grouped. Flow context is a saved excerpt, not verified navigation. Inspect returned images before recommending a reference.",
       };
     } finally {
       db.close();
     }
   }
+}
+
+/** Keep bulk OCR boxes out of every search/comparison response; get returns the full JSON. */
+export function compactKnowledge(record: KnowledgeRecord) {
+  const { automation_evidence, ...reference } = record;
+  return {
+    ...reference,
+    automation_summary: automation_evidence
+      ? {
+          pipeline_version: automation_evidence.pipeline_version,
+          ocr_regions: automation_evidence.ocr.text.length,
+          ocr_excerpt: automation_evidence.ocr.text
+            .map((t) => t.text)
+            .join(" | ")
+            .slice(0, 600),
+          pattern_candidates: automation_evidence.pattern_candidates,
+          layout_candidate: automation_evidence.layout_candidate,
+          flow_memberships: automation_evidence.flow_memberships.length,
+          note: "Machine-generated, unreviewed candidates. Use get for full OCR boxes, component evidence and all provided flow memberships.",
+        }
+      : undefined,
+  };
+}
+
+export function knowledgeSearchContent(record: KnowledgeRecord) {
+  return [
+    record.title,
+    record.summary,
+    ...record.patterns,
+    ...record.components.flatMap((c) => [c.type, c.description]),
+    ...record.observations,
+    ...record.interpretations,
+    ...record.visual_details.flatMap((v) => [v.attribute, v.value]),
+    ...(record.automation_evidence?.ocr.text.map((t) => t.text) ?? []),
+  ].join("\n");
 }

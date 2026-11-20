@@ -33,7 +33,7 @@ For cross-app inspiration, set `result_mode: "app_diverse"` on local search or a
 
 Add an inspected screen or cropped card/dialog with pattern labels, component descriptions, visual observations, estimates and source attribution. Search those references by text or component image, then compare actual alternatives with their saved flow context. Your coding agent supplies semantic annotations using its existing vision; local CLIP supplies embeddings. No additional AI API is called.
 
-Five knowledge tools are available alongside the existing local screenshot tools: status, save, search, get, and compare. `npm run knowledge:pilot` installs nine reviewed references from the existing licensed pilot without changing its screenshots or flows. This is an explicit annotation layer, not automatic labeling of all 1,000 screens. [Workflow, tool arguments, coverage and limitations](docs/ui-knowledge.md).
+Five knowledge tools are available alongside the existing local screenshot tools: status, save, search, get, and compare. `npm run knowledge:pilot` installs nine reviewed references from the existing licensed pilot without changing its screenshots or flows. The full local catalog also provides 1,000 machine-generated screen descriptions, clearly separated from reviewed entries. OCR text and geometry, inferred UI candidates, measured raster details and complete provided flow memberships are available as local JSON and through the MCP. [Full catalog, confidence and usage](docs/ui-catalog.md). [Workflow, tool arguments, coverage and limitations](docs/ui-knowledge.md).
 
 ## Screenshot references in 1.6
 

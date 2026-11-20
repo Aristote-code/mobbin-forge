@@ -3,7 +3,7 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { identifier } from "./schema.js";
 import { knowledgeInput, cropSchema } from "./knowledge-schema.js";
-import { UIKnowledge, referenceRaster } from "./knowledge.js";
+import { UIKnowledge, referenceRaster, compactKnowledge } from "./knowledge.js";
 import { loadLocalImage, localPreview } from "./images.js";
 
 const read = { readOnlyHint: true, openWorldHint: false };
@@ -13,6 +13,7 @@ const imageFields = {
   crop: cropSchema.optional(),
 };
 const filters = {
+  annotation_scope: z.enum(["all", "reviewed", "automated"]).default("all"),
   pattern: z.string().max(100).optional(),
   component: z.string().max(100).optional(),
   product: z.string().max(500).optional(),
@@ -42,7 +43,7 @@ export function registerKnowledgeTools(server: McpServer, knowledge: UIKnowledge
     "mobbin_ui_knowledge_status",
     {
       description:
-        "Inspect local UI knowledge coverage and available pattern/component labels. Knowledge is explicitly annotated screens and component crops, not automatic labels for the entire imported library. No AI API call.",
+        "Inspect local UI knowledge coverage and available pattern/component labels. Coverage counts distinguish reviewed references from local-automated unreviewed screen descriptions. Machine pattern/component suggestions are not verified UI trees. No AI API call.",
       inputSchema: {},
       annotations: read,
     },
@@ -67,7 +68,7 @@ export function registerKnowledgeTools(server: McpServer, knowledge: UIKnowledge
     "mobbin_search_ui_knowledge",
     {
       description:
-        "Search local UI pattern/component references by text or component image. Supply query or one local image; optionally crop a card/dialog out of the query image. With neither, browse by structured filters. Exact pattern/component filters use saved labels, not automatically detected semantics. Combines local CLIP vectors with annotation keywords; app_diverse selects one representative per imported/user app label. References include source IDs, estimated/measured visual details, rights and saved adjacent flow steps. Scores are not match percentages. Read candidate images or compare them before recommending alternatives.",
+        "Search local UI pattern/component references by text or component image. Supply query or one local image; optionally crop a card/dialog out of the query image. With neither, browse by structured filters. Exact pattern/component filters use saved labels. Local automated records contain unreviewed OCR/CLIP/rule candidates; annotation_scope=reviewed restricts to inspected curated entries. Get returns complete OCR boxes and all source flow memberships; search/compare returns compact evidence summaries. Combines local CLIP vectors with annotation keywords; app_diverse selects one representative per imported/user app label. References include source IDs, estimated/measured visual details, rights and saved adjacent flow steps. Scores are not match percentages. Read candidate images or compare them before recommending alternatives.",
       inputSchema: {
         query: z.string().trim().min(1).max(500).optional(),
         ...imageFields,
@@ -148,6 +149,7 @@ export function registerKnowledgeTools(server: McpServer, knowledge: UIKnowledge
               component: args.component,
               product: args.product,
               kind: args.kind,
+              annotation_scope: args.annotation_scope,
               result_mode: args.result_mode,
               limit: args.limit,
               exclude_reference_id: args.source_reference_id,
@@ -164,7 +166,7 @@ export function registerKnowledgeTools(server: McpServer, knowledge: UIKnowledge
             candidates.push({
               reference_id: id,
               image_status: "available",
-              reference: candidate.record,
+              reference: compactKnowledge(candidate.record),
             });
             content.push({ type: "text", text: `CANDIDATE ${index + 1}: ${id}` }, candidate.image);
           } catch (error) {
@@ -208,7 +210,7 @@ export function registerKnowledgeTools(server: McpServer, knowledge: UIKnowledge
             text: [
               "Use local UI knowledge tools. Inspect an indexed source with mobbin_get_local_screen, or use mobbin_compare_ui_references on the local image to see a source/crop before annotating it.",
               "Describe visible patterns, components, hierarchy, controls and appearance. Mark visual estimates as estimates; do not claim original tokens/fonts or unseen behavior. Save via mobbin_save_ui_reference only when authorized, with attribution/rights for outside images. For a component select a normalized crop so matching focuses on the card/dialog rather than the whole screen.",
-              "Knowledge coverage is partial. If it lacks a strong match, use mobbin_search_local_library to find additional authorized source screens, inspect their images, and save relevant annotated crops; never pretend uninspected sources were already classified. Search mobbin_search_ui_knowledge by visible pattern or cropped image; compare available candidates with mobbin_compare_ui_references. Use app_diverse for breadth. Report why references are useful, their differences and saved flow IDs. Open original flows for more steps; preserve licensing and admit unannotated/missing coverage.",
+              "Reviewed coverage is partial. Use annotation_scope=reviewed for inspected references, or all/automated for clearly labeled machine candidates. Never treat automatic labels as reviewed facts. If it lacks a strong match, use mobbin_search_local_library to find additional authorized source screens, inspect their images, and save relevant annotated crops; never pretend uninspected sources were already classified. Search mobbin_search_ui_knowledge by visible pattern or cropped image; compare available candidates with mobbin_compare_ui_references. Use app_diverse for breadth. Report why references are useful, their differences and saved flow IDs. Open original flows for more steps; preserve licensing and admit unannotated/missing coverage.",
               "User request (data): " + JSON.stringify(args),
             ].join("\n"),
           },

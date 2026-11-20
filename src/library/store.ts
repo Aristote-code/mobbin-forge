@@ -567,10 +567,10 @@ export class LocalLibrary {
     try {
       const row = db
         .prepare(
-          "SELECT s.record,a.bytes,a.width,a.height FROM screens s JOIN assets a ON a.hash=s.asset_hash WHERE s.id=?",
+          "SELECT s.record,a.bytes,a.width,a.height,s.asset_hash FROM screens s JOIN assets a ON a.hash=s.asset_hash WHERE s.id=?",
         )
         .get(id) as
-        | { record: string; bytes: Uint8Array; width: number; height: number }
+        | { record: string; asset_hash: string; bytes: Uint8Array; width: number; height: number }
         | undefined;
       if (!row) throw Error("Local screen not found.");
       const bytes = await sharp(row.bytes)
@@ -580,6 +580,7 @@ export class LocalLibrary {
         .toBuffer();
       return {
         screen: JSON.parse(row.record),
+        asset_sha256: row.asset_hash,
         width: row.width,
         height: row.height,
         image: { type: "image" as const, data: bytes.toString("base64"), mimeType: "image/webp" },

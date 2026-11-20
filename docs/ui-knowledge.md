@@ -5,9 +5,10 @@ specific card, a dialog, or another component. Ask for alternatives by visible
 pattern or component image, inspect real candidates, and follow their original
 flows. No separate website or paid AI API is required.
 
-The knowledge layer is **explicitly annotated**. Codex, Claude or the user supplies
+The knowledge layer supports **reviewed annotations and clearly marked local-automated descriptions**. Codex, Claude or the user supplies
 patterns and observations after looking at the image; the server does not run a
-vision LLM or automatically classify every screenshot. It runs cached local CLIP
+vision LLM. The bulk catalog supplies unreviewed OCR/CLIP/rule candidates for every
+authorized screenshot; it does not claim complete or verified UI semantics. It runs cached local CLIP
 for image/text embeddings and SQLite FTS5 for annotation keywords.
 
 ## First working pilot
@@ -34,7 +35,7 @@ The command calls the real stdio MCP, installs the reviewed annotations, validat
 search/comparison and writes ignored verification artifacts. Existing pilot IDs
 are skipped so rerunning does not overwrite your edits. The descriptions are
 hand-reviewed pilot annotations, not automatically generated labels or an unseen
-relevance benchmark. Most of the original 1,000 screens remain unannotated.
+relevance benchmark. The separate full-corpus catalog now adds 1,000 local-automated, unreviewed screen descriptions; these nine remain the reviewed seed. See [the catalog guide](ui-catalog.md).
 
 ## Tools
 
@@ -187,8 +188,8 @@ Images, annotations, vectors and keyword text are in
 `~/.mobbin-mcp/library/knowledge.sqlite`, or the configured `MOBBIN_LIBRARY_DIR`.
 This is separate from `library.sqlite`; importing/replacing the original corpus
 does not delete UI knowledge. Database files are private to the local installation.
-The pilot limit is 1,000 knowledge references, separately from the 1,000 source
-screens. Model identity is stored with each embedding; incompatible vectors are
+Knowledge capacity is 10,000 references, separately from the 1,000 source
+screens, so automatic descriptions do not displace curated components. Model identity is stored with each embedding; incompatible vectors are
 rejected instead of mixed. No new model weights or index migration are required.
 
 Omit `reference_id` to create a new ID. For a stable ID, create it with revision 0
@@ -216,3 +217,13 @@ stay in ignored `output/verification/ui-knowledge/`.
 These checks establish functionality for a small reviewed pilot. They do not
 establish full-corpus semantic coverage or general relevance quality. Next data
 work can add inspected references for the patterns the user actually needs.
+
+## Search the full automatic catalog
+
+All 1,000 authorized source screenshots now have structured JSON records. Use
+`annotation_scope: "all"` (default) or `"automated"` to search them; use
+`"reviewed"` to restrict results to inspection-attested references. Automatic
+records always have `annotation.basis: "local_automated"` and
+`image_inspected: false`. The search and comparison outputs summarize automatic
+evidence; `mobbin_get_ui_reference` returns the full OCR boxes, candidates and
+provided flow memberships. See [catalog generation and verification](ui-catalog.md).

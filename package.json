@@ -29,7 +29,9 @@
     "benchmark:library": "npm run build && node scripts/benchmark-local-library.mjs",
     "test:library:comparison": "npm run build && node scripts/verify-local-comparison.mjs",
     "test:library:diversity": "npm run build && node scripts/verify-local-diversity.mjs",
-    "knowledge:pilot": "npm run build && node scripts/seed-ui-knowledge.mjs"
+    "knowledge:pilot": "npm run build && node scripts/seed-ui-knowledge.mjs",
+    "catalog:build": "npm run build && node scripts/build-ui-catalog.mjs",
+    "catalog:verify": "npm run build && node scripts/verify-ui-catalog.mjs"
   },
   "keywords": [
     "mcp",
