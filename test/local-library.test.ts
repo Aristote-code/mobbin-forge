@@ -242,7 +242,7 @@ test("library-only MCP serves actual screenshots, local search and paginated flo
     assert.ok(!result.isError, JSON.stringify(result));
     return result;
   };
-  assert.equal((await client.listTools()).tools.length, 5);
+  assert.equal((await client.listTools()).tools.length, 10);
   assert.equal((await call("mobbin_local_library_status", {})).structuredContent!.screens, 3);
   const found = await call("mobbin_search_local_library", {
     image_base64: blue.toString("base64"),

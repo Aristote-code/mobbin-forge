@@ -25,9 +25,15 @@ node dist/index.js library import "$HOME/.mobbin-mcp/pilot/openmobile/manifest.j
 node dist/index.js library search calendar create event
 ```
 
-Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the five local-library tools alongside the existing Mobbin tools. Search groups repeated frames while retaining their IDs and flow links. `mobbin_compare_local_screens` returns a source, up to four labeled candidates, and adjacent flow steps for your agent to inspect locally. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
+Use `node dist/index.js library serve` as a standalone MCP without Mobbin authentication, or use the ten local-library tools alongside the existing Mobbin tools. Search groups repeated frames while retaining their IDs and flow links. `mobbin_compare_local_screens` returns a source, up to four labeled candidates, and adjacent flow steps for your agent to inspect locally. [Setup, manifest format, source licensing, limits, and validation](docs/local-library.md).
 
 For cross-app inspiration, set `result_mode: "app_diverse"` on local search or auto comparison. It prefers one reference per imported app label and uses a conservative similarity-gap guard for image queries. `closest` remains the default. A native agent can also describe the source's visible UI pattern, run a diverse text search, and compare that shortlist locally.
+
+## Local UI knowledge and component references
+
+Add an inspected screen or cropped card/dialog with pattern labels, component descriptions, visual observations, estimates and source attribution. Search those references by text or component image, then compare actual alternatives with their saved flow context. Your coding agent supplies semantic annotations using its existing vision; local CLIP supplies embeddings. No additional AI API is called.
+
+Five knowledge tools are available alongside the existing local screenshot tools: status, save, search, get, and compare. `npm run knowledge:pilot` installs nine reviewed references from the existing licensed pilot without changing its screenshots or flows. This is an explicit annotation layer, not automatic labeling of all 1,000 screens. [Workflow, tool arguments, coverage and limitations](docs/ui-knowledge.md).
 
 ## Screenshot references in 1.6
 

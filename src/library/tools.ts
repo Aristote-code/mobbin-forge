@@ -1,6 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import { UIKnowledge } from "./knowledge.js";
+import { registerKnowledgeTools } from "./knowledge-tools.js";
 import { identifier } from "./schema.js";
 import { LocalLibrary } from "./store.js";
 import { loadLocalImage } from "./images.js";
@@ -23,6 +25,7 @@ async function guarded(action: () => Promise<CallToolResult>): Promise<CallToolR
   }
 }
 export function registerLibraryTools(server: McpServer, library: LocalLibrary) {
+  registerKnowledgeTools(server, new UIKnowledge(library));
   server.registerTool(
     "mobbin_local_library_status",
     {

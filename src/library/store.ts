@@ -64,6 +64,12 @@ export class LocalLibrary {
     );
     this.engine = engine ?? new LocalEmbedder(path.join(this.directory, "models"));
   }
+  async imageVectors(bytes: Uint8Array) {
+    return this.engine.image(bytes);
+  }
+  async textVector(text: string) {
+    return this.engine.text(text);
+  }
   private filename() {
     return path.join(this.directory, "library.sqlite");
   }

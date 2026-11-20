@@ -33,7 +33,7 @@ const call = async (name, args) => {
 };
 try {
   await client.connect(transport);
-  assert.equal((await client.listTools()).tools.length, 5);
+  assert.equal((await client.listTools()).tools.length, 10);
   const status = (await call("mobbin_local_library_status", {})).structuredContent;
   assert.equal(status.manifest_sha256, createHash("sha256").update(manifestBytes).digest("hex"));
   assert.equal(status.screens, manifest.screens.length);

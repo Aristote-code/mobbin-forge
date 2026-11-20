@@ -335,3 +335,10 @@ closest-mode preservation, image-gap exclusion, MCP option forwarding, and
 explicit-shortlist preservation. Build, lint, formatting, the real local stdio
 checks, and the unchanged 24-query scoring baseline pass. No screenshots, models,
 or the SQLite library are included in the Git changes.
+
+## UI knowledge and component-level search
+
+The same local MCP also exposes five UI knowledge tools for adding annotated
+screens/component crops, searching by pattern or component image, and comparing
+references with flow context. See [UI knowledge](ui-knowledge.md) for the first
+reviewed pilot, adding your own card, rights, estimates, and coverage limits.
